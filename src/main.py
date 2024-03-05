@@ -35,7 +35,7 @@ def main(name, max_ram, min_ram, port, rcon, volumes, hardcore, difficulty, vers
         'itzg/minecraft-server',
         detach=True,
         name=name,
-        ports={f'{port}/tcp': 25565},
+        ports={f'25565/tcp': port},
         environment=[
             f'EULA=TRUE',
             f'SERVER_MAX_RAM={max_ram}',
