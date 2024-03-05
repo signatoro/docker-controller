@@ -22,7 +22,7 @@ def main(name, max_ram, min_ram, port, rcon, volumes, hardcore, difficulty, vers
         f'EULA=TRUE',
         f'SERVER_MAX_RAM={max_ram}',
         f'SERVER_MIN_RAM={min_ram}',
-        f'RCON_ENABLED={rcon}',
+        f'RCON_ENABLED=true',
         f'RCON_PASSWORD=super',
         f'HARDCORE={hardcore}',
         f'DIFFICULTY={difficulty}',
@@ -70,7 +70,7 @@ if __name__ == "__main__":
     parser.add_argument('--max-ram', default='2G', help='Maximum RAM for the server')
     parser.add_argument('--min-ram', default='1G', help='Initial RAM for the server')
     parser.add_argument('--port', '-p', default=25565, type=int, help='Port to run the server on')
-    parser.add_argument('--rcon', default=None, type=str, help='Password for the RCON for the server. Default leave RCON off.')
+    parser.add_argument('--rcon', default=True, type=bool, help='Password for the RCON for the server. Default leave RCON off.')
     parser.add_argument('--volumes', '-v', help='List of volumes to mount to the server')
     parser.add_argument('--hardcore', default=False, type=bool, help='Enable hardcore mode for the server. Default is false.')
     parser.add_argument('--difficulty', default=2, type=int, help='Set the difficulty for the server using ints (easy 1, medium 2, hard 3). Default is normal (2).')
