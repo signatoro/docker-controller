@@ -1,3 +1,4 @@
+import time
 import docker
 import argparse
 from mcrcon import MCRcon
@@ -39,6 +40,7 @@ def main(name, max_ram, min_ram, port, rcon, volumes, hardcore, difficulty, vers
 
     print(f'Minecraft server started with container ID: {container.id}')
 
+    time.sleep(60)
     # Send command to the server
     send_command('say Hello World')
     send_command('op CouchComfy')
