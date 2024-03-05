@@ -17,11 +17,11 @@ def main(name, max_ram, min_ram, port, rcon, volumes, hardcore, difficulty, vers
 
     client = docker.from_env()
 
-    f_port: dict = {f'25565/tcp': port}
+    f_port: dict = {f'25565/tcp': port,
+                    f'25575/tcp': 25575}
     f_environment: list = [
         f'EULA=TRUE',
-        f'SERVER_MAX_RAM={max_ram}',
-        f'SERVER_MIN_RAM={min_ram}',
+        f'JVM_OPTS=-Xms{min_ram} -Xmx{max_ram}',
         f'RCON_ENABLED=true',
         f'RCON_PASSWORD=super',
         f'HARDCORE={hardcore}',
@@ -42,12 +42,13 @@ def main(name, max_ram, min_ram, port, rcon, volumes, hardcore, difficulty, vers
 
     time.sleep(60)
     # Send command to the server
+    print("Sending command to the server")
     send_command('say Hello World')
     send_command('op CouchComfy')
     
     return 0
 
-def send_command(self, command):
+def send_command(command):
     response = ''
     try:
         # Replace 'your_rcon_password' and 'your_minecraft_server_ip' with your actual RCON password and server IP
