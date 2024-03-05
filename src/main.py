@@ -1,5 +1,7 @@
 import docker
 import argparse
+import signal
+import sys
 
 def main(name, max_ram, min_ram, port, rcon, volumes, hardcore, difficulty, version):
 
@@ -14,6 +16,20 @@ def main(name, max_ram, min_ram, port, rcon, volumes, hardcore, difficulty, vers
     print(f'Version: {version}')
 
     client = docker.from_env()
+
+
+    def stop_container(signal, frame):
+        print("Stopping Minecraft server container...")
+        try:
+            container = client.containers.get(name)
+            container.stop()
+            print("Minecraft server container stopped.")
+        except docker.errors.NotFound:
+            print(f"Container {name} not found.")
+        sys.exit(0)
+
+    # Register the signal handler
+    signal.signal(signal.SIGINT, stop_container)
 
     container = client.containers.run(
         'itzg/minecraft-server',
