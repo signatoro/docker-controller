@@ -4,6 +4,8 @@ import argparse
 import logging
 from mcrcon import MCRcon
 
+
+
 def main(name, max_ram, port, rcon, volumes, hardcore, difficulty, version):
     # Configure logging
     logging.basicConfig(filename='server.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
