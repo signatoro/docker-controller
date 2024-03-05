@@ -21,7 +21,7 @@ def main(name, max_ram, min_ram, port, rcon, volumes, hardcore, difficulty, vers
                     f'25575/tcp': 25575}
     f_environment: list = [
         f'EULA=TRUE',
-        f'JVM_OPTS=-Xms{min_ram} -Xmx{max_ram}',
+        f'MEMORY={max_ram}',
         f'RCON_ENABLED=true',
         f'RCON_PASSWORD=super',
         f'HARDCORE={hardcore}',
