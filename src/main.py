@@ -10,7 +10,6 @@ import sys
 class MC_Server_Controller:
 
     container: Container = None
-
     def __init__(self, level_str, name, max_ram, port, rcon, volumes, hardcore, difficulty, version):
         self.level_str = level_str
         self.name = name
@@ -44,7 +43,7 @@ class MC_Server_Controller:
             current_time = time.time()
 
             logging.debug(f'current time: {current_time} last restart time: {self.last_restart_time}')
-            if current_time - self.last_restart_time >=  5 * 60:
+            if current_time - self.last_restart_time >=  24 * 60 * 60:
                 self.restart_server()
                 self.last_restart_time = current_time
 
