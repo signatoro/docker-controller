@@ -34,7 +34,7 @@ class MC_Server_Controller:
     
     def run(self):
         logging.info('Starting server monitor')
-        self.server_running = True
+        
 
         while self.server_running:
             self.container.reload()
@@ -44,7 +44,7 @@ class MC_Server_Controller:
             current_time = time.time()
 
             logging.debug(f'current time: {current_time} last restart time: {self.last_restart_time}')
-            if current_time - self.last_restart_time >= 24 * 60 * 60:
+            if current_time - self.last_restart_time >=  5 * 60:
                 self.restart_server()
                 self.last_restart_time = current_time
 
@@ -111,8 +111,9 @@ class MC_Server_Controller:
         self.__check_server_online()
 
         logging.info(f'Minecraft server started with container ID: {self.container.id}')
-        return self.container.id
-    
+
+        self.server_running = True
+        
     def restart_server(self):
         logging.info("Restarting server")
         if self.server_running:
