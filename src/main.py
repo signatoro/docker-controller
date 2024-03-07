@@ -89,7 +89,7 @@ class MC_Server_Controller:
         
         f_environment: list = [
             f'EULA=TRUE',
-            f'MEMORY={self.max_ram}',
+            f'JVM_OPTS=-Xms1G -Xmx{self.max_ram}',
             f'HARDCORE={self.hardcore}',
             f'DIFFICULTY={self.difficulty}',
         ]
