@@ -37,13 +37,13 @@ class MC_Server_Controller:
 
         while self.server_running:
             self.container.reload()
-            logging.debug(f"Container status: {self.container.status}")
-            time.sleep(3)
+            logging.info(f"Container status: {self.container.status}")
+            time.sleep(10)
 
             current_time = time.time()
 
             logging.debug(f'current time: {current_time} last restart time: {self.last_restart_time}')
-            if current_time - self.last_restart_time >=  24 * 60 * 60:
+            if current_time - self.last_restart_time >= 24 * 60 * 60:
                 self.restart_server()
                 self.last_restart_time = current_time
 
@@ -71,11 +71,29 @@ class MC_Server_Controller:
         logging.getLogger().addHandler(stream_handler)
 
     def start_docker_container(self):
+        logging.info('Starting server')
 
-        if self.client.containers.list(filters={'name': self.name}): 
-            logging.error(f'Container with name {self.name} already exists')
-            raise Exception(f'Container with name {self.name} already exists')
+        if self.client.containers.list(all=True, filters={'name': self.name}):
+            logging.info(f'Container {self.name} exists')
+            self.container = self.client.containers.get(self.name)
+            if self.container.status == 'exited':
+                logging.debug(f'Container {self.name} is stopped. starting...')
+                self.container.start()
+                self.__check_server_online()
+                self.server_running = True            
+            elif self.container.status == 'running':
+                logging.debug(f'Container {self.name} is already running')
+                self.server_running = True 
+                self.run()  
+            else:
+                logging.error(f'!! Unknown Status !! Container status: {self.container.status}')
+                raise Exception(f'!! Unknown Status !! Container status: {self.container.status}')
+        else:
+            logging.info(f'Container does not exist creating {self.name}')
+            self.create_docker_container()
 
+
+    def create_docker_container(self):
         logging.info('Starting Minecraft server with the following parameters:')
         logging.info(f'Max RAM: {self.max_ram}')
         logging.info(f'Port: {self.port}')
@@ -104,7 +122,7 @@ class MC_Server_Controller:
             name=self.name,
             ports=f_port,
             environment=f_environment,
-            volumes={self.volumes:  {'bind': '/data/world', 'mode': 'rw'}},
+            volumes={self.volumes:  {'bind': '/data', 'mode': 'rw'}},
         )
         
         self.__check_server_online()
@@ -114,10 +132,10 @@ class MC_Server_Controller:
         self.server_running = True
         
     def restart_server(self):
-        logging.info("Restarting server")
+        logging.info("Restarting server Soon")
         if self.server_running:
             self.shutdown_server()
-            
+            time.sleep(10)
             self.start_docker_container()
         else:
             logging.error("Server is not running")
@@ -129,11 +147,11 @@ class MC_Server_Controller:
 
             self.send_command("say !! The server will reset in 30 minute !!")
 
-            time.sleep(60 * 20)
+            time.sleep(20 * 60)
 
             self.send_command("say !! The server will reset in 10 minutes !!")
 
-            time.sleep(60 * 9)
+            time.sleep(9 * 60)
 
             self.send_command("say !! The world will reset in 45 seconds !!")
 
@@ -144,7 +162,7 @@ class MC_Server_Controller:
             time.sleep(5)
             
             self.send_command("say !! The server is being shut down !!") 
-            self.send_command("say !! It will restart in a few minutes !!")
+            self.send_command("say !! It will restart in a few moments !!")
 
             time.sleep(3)
             
@@ -152,19 +170,17 @@ class MC_Server_Controller:
 
             self.container.stop()
 
-            time.sleep(10)
-            
-            self.container.remove()
+            self.__await_status('exited')
 
             self.server_running = False
-            print("Server Fully Stopped")
+            logging.info("Server shutdown complete")
         else:
             logging.debug("Server is already shutdown")
 
     def send_command(self, command):
         response = ''
 
-        logging.info(f'Sending command: {command}')
+        logging.debug(f'Sending command: {command}')
         try:
             # Replace 'your_rcon_password' and 'your_minecraft_server_ip' with your actual RCON password and server IP
             with MCRcon('0.0.0.0', 'super', 25575, timeout=10) as client:
@@ -182,9 +198,14 @@ class MC_Server_Controller:
         while response == 'failed':
             time.sleep(6)
             response = self.send_command("say hi")
-            
-        
         return
+    
+    def __await_status(self, status):
+        logging.info(f'Awaiting status: {status}')
+        while self.container.status != status:
+            logging.debug(f'Container status: {self.container.status}, Expected: {status}')
+            time.sleep(6)
+            self.container.reload()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Start Minecraft server with Docker')
