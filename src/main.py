@@ -2,6 +2,7 @@ import time
 import docker
 import argparse
 import logging
+import shutil
 from logging.handlers import RotatingFileHandler
 from docker.models.containers import Container
 from mcrcon import MCRcon
@@ -24,11 +25,8 @@ class MC_Server_Controller:
         self.server_running = False
         self.client = docker.from_env()
         self.last_restart_time = time.time()
-
-
+        
         self.start_docker_container()
-        logging.info('Server started')
-
     
     def run(self):
         logging.info('Starting server monitor')
@@ -36,7 +34,6 @@ class MC_Server_Controller:
 
         while self.server_running:
             self.container.reload()
-            logging.info(f"Container status: {self.container.status}")
             time.sleep(10)
 
             current_time = time.time()
@@ -46,8 +43,6 @@ class MC_Server_Controller:
                 self.restart_server()
                 self.last_restart_time = current_time
 
-
-    
 
     def start_docker_container(self):
         logging.info('Starting server')
@@ -114,7 +109,9 @@ class MC_Server_Controller:
         logging.info("Restarting server Soon")
         if self.server_running:
             self.shutdown_server()
-            time.sleep(10)
+            time.sleep(3)
+            self.backup_server_folder()
+            time.sleep(3)
             self.start_docker_container()
         else:
             logging.error("Server is not running")
@@ -149,12 +146,21 @@ class MC_Server_Controller:
 
             self.container.stop()
 
+            # TODO: Check to see if this works.
             self.__await_status('exited')
 
             self.server_running = False
+            time.sleep(4)
             logging.info("Server shutdown complete")
         else:
             logging.debug("Server is already shutdown")
+
+
+    def backup_server_folder(self):
+        logging.info("Backing up server folder")
+        shutil.make_archive('server_backup', 'zip', self.volumes)
+        logging.info("Backup complete")
+
 
     def send_command(self, command):
         response = ''
@@ -198,15 +204,15 @@ def set_up_logging(level_str, log_file_size=1):
     else:
         logging_level = logging.INFO
 
-    # logging.basicConfig(filename='server.log', level=logging_level, format='%(asctime)s - %(levelname)s - %(message)s')
+    logging.basicConfig(level=logging_level, format='%(asctime)s - %(levelname)s - %(message)s')
 
-    # Create a stream handler to print logs to the terminal
-    stream_handler = logging.StreamHandler(sys.stdout)
-    stream_handler.setLevel(logging_level)
-    stream_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+    # # Create a stream handler to print logs to the terminal
+    # stream_handler = logging.StreamHandler(sys.stdout)
+    # stream_handler.setLevel(logging_level)
+    # stream_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
 
-    # Add the stream handler to the root logger
-    logging.getLogger().addHandler(stream_handler)
+    # # Add the stream handler to the root logger
+    # logging.getLogger().addHandler(stream_handler)
 
     # Add a rotating file handler to limit the log file size
     file_handler = RotatingFileHandler('server.log', maxBytes=1024*1024*log_file_size, backupCount=5)
@@ -214,7 +220,9 @@ def set_up_logging(level_str, log_file_size=1):
     file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
 
     # Add the file handler to the root logger
-    logging.getLogger().addHandler(file_handler)
+
+    logging.basicConfig(level=logging_level)
+    return
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Start Minecraft server with Docker')

@@ -3,6 +3,10 @@
 worlds/*
 
 *.log
+*.log.*
 data/*
 
 .vscode/
+*.zip
+
+build/
