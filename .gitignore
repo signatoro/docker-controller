@@ -4,3 +4,5 @@ worlds/*
 
 *.log
 data/*
+
+.vscode/

@@ -2,6 +2,7 @@ import time
 import docker
 import argparse
 import logging
+from logging.handlers import RotatingFileHandler
 from docker.models.containers import Container
 from mcrcon import MCRcon
 import sys
@@ -10,8 +11,7 @@ import sys
 class MC_Server_Controller:
 
     container: Container = None
-    def __init__(self, level_str, name, max_ram, port, rcon, volumes, hardcore, difficulty, version):
-        self.level_str = level_str
+    def __init__(self, name, max_ram, port, rcon, volumes, hardcore, difficulty, version):
         self.name = name
         self.max_ram = max_ram
         self.port = port
@@ -26,7 +26,6 @@ class MC_Server_Controller:
         self.last_restart_time = time.time()
 
 
-        self.set_up_logging(self.level_str)
         self.start_docker_container()
         logging.info('Server started')
 
@@ -48,27 +47,7 @@ class MC_Server_Controller:
                 self.last_restart_time = current_time
 
 
-    def set_up_logging(self, level_str):
-        if level_str == 'DEBUG':
-            logging_level = logging.DEBUG
-        elif level_str == 'CRITICAL':
-            logging_level = logging.CRITICAL
-        elif level_str == 'ERROR':
-            logging_level = logging.ERROR
-        elif level_str == 'WARNING':
-            logging_level = logging.WARNING
-        else:
-            logging_level = logging.INFO
-
-        logging.basicConfig(filename='server.log', level=logging_level, format='%(asctime)s - %(levelname)s - %(message)s')
-
-        # Create a stream handler to print logs to the terminal
-        stream_handler = logging.StreamHandler(sys.stdout)
-        stream_handler.setLevel(logging_level)
-        stream_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
-
-        # Add the stream handler to the root logger
-        logging.getLogger().addHandler(stream_handler)
+    
 
     def start_docker_container(self):
         logging.info('Starting server')
@@ -207,6 +186,36 @@ class MC_Server_Controller:
             time.sleep(6)
             self.container.reload()
 
+def set_up_logging(level_str, log_file_size=1):
+    if level_str == 'DEBUG':
+        logging_level = logging.DEBUG
+    elif level_str == 'CRITICAL':
+        logging_level = logging.CRITICAL
+    elif level_str == 'ERROR':
+        logging_level = logging.ERROR
+    elif level_str == 'WARNING':
+        logging_level = logging.WARNING
+    else:
+        logging_level = logging.INFO
+
+    # logging.basicConfig(filename='server.log', level=logging_level, format='%(asctime)s - %(levelname)s - %(message)s')
+
+    # Create a stream handler to print logs to the terminal
+    stream_handler = logging.StreamHandler(sys.stdout)
+    stream_handler.setLevel(logging_level)
+    stream_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+
+    # Add the stream handler to the root logger
+    logging.getLogger().addHandler(stream_handler)
+
+    # Add a rotating file handler to limit the log file size
+    file_handler = RotatingFileHandler('server.log', maxBytes=1024*1024*log_file_size, backupCount=5)
+    file_handler.setLevel(logging_level)
+    file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+
+    # Add the file handler to the root logger
+    logging.getLogger().addHandler(file_handler)
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Start Minecraft server with Docker')
     parser.add_argument('--max-ram', default='2G', help='Maximum RAM for the server')
@@ -218,12 +227,14 @@ if __name__ == "__main__":
     parser.add_argument('--version', default='latest', help='Minecraft server version')
     parser.add_argument('--name', '-n', default='minecraft-server', help='Minecraft server name')
     parser.add_argument('--log-level', '-l', default=None, help='Set the logging level for the server')
+    parser.add_argument('--log-file-size', default=2, type=int, help='Set the max size of the log file in MB')
 
     if parser.parse_args().volumes == None:
         parser.error('Please provide a volume to mount to the server')
 
+    set_up_logging(parser.parse_args().log_level, parser.parse_args().log_file_size)
+
     controller = MC_Server_Controller(
-        parser.parse_args().log_level,
         parser.parse_args().name,
         parser.parse_args().max_ram,
         parser.parse_args().port,
