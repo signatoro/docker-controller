@@ -6,7 +6,7 @@ import shutil
 from logging.handlers import RotatingFileHandler
 from docker.models.containers import Container
 from mcrcon import MCRcon
-import sys
+
 
 
 class MC_Server_Controller:
