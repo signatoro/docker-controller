@@ -25,7 +25,7 @@ jobs:
         #   run: pytest
 
         - name: Lint code
-          run: pylint src/main.py
+          run: pylint --rcfile .pylintrc src/main.py
 
         - name: Build executable
           run: pyinstaller --onefile src/main.py -n mc_server_controller
