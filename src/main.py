@@ -1,18 +1,62 @@
+
 import time
-import docker
-import argparse
-import logging
 import shutil
+import logging
+import argparse
 from logging.handlers import RotatingFileHandler
-from docker.models.containers import Container
+
+import docker
 from mcrcon import MCRcon
+from docker.models.containers import Container
 
+class McServerController:
+    """
+    A class representing a Minecraft Server Controller.
 
+    Attributes:
+    - name (str): The name of the Minecraft server container.
+    - max_ram (str): The maximum amount of RAM allocated to the server.
+    - port (int): The port number for the server.
+    - rcon (str): The RCON password for the server.
+    - volumes (str): The path to the server data volume.
+    - hardcore (bool): Whether hardcore mode is enabled.
+    - difficulty (str): The difficulty level of the server.
+    - version (str): The version of Minecraft server to run.
+    - container (Container): The Docker container object representing the Minecraft server.
+    - server_running (bool): Indicates whether the server is currently running.
+    - client (DockerClient): The Docker client object for interacting with Docker.
+    - last_restart_time (float): The timestamp of the last server restart.
 
-class MC_Server_Controller:
+    Methods:
+    - __init__(self, name, max_ram, port, rcon, volumes, hardcore, difficulty, version): 
+        Initializes the Minecraft Server Controller.
+    - run(self): Starts the server monitor loop.
+    - start_docker_container(self): Starts the Docker container for the Minecraft server.
+    - create_docker_container(self): Creates a new Docker container for the Minecraft server.
+    - restart_server(self): Restarts the Minecraft server.
+    - shutdown_server(self): Shuts down the Minecraft server.
+    - backup_server_folder(self): Performs a backup of the server folder.
+    - send_command(self, command): Sends a command to the Minecraft server via RCON.
+    - __check_server_online(self): Checks if the server is online and ready to accept commands.
+    - __await_status(self, status): Waits for the container status to reach the specified status.
+    """
 
     container: Container = None
+
     def __init__(self, name, max_ram, port, rcon, volumes, hardcore, difficulty, version):
+        """
+        Initializes the Minecraft Server Controller.
+
+        Args:
+        - name (str): The name of the Minecraft server container.
+        - max_ram (str): The maximum amount of RAM allocated to the server.
+        - port (int): The port number for the server.
+        - rcon (str): The RCON password for the server.
+        - volumes (str): The path to the server data volume.
+        - hardcore (bool): Whether hardcore mode is enabled.
+        - difficulty (str): The difficulty level of the server.
+        - version (str): The version of Minecraft server to run.
+        """
         self.name = name
         self.max_ram = max_ram
         self.port = port
@@ -25,12 +69,23 @@ class MC_Server_Controller:
         self.server_running = False
         self.client = docker.from_env()
         self.last_restart_time = time.time()
-        
         self.start_docker_container()
-    
+
     def run(self):
+        """
+        Runs the server monitor.
+
+        This method continuously monitors the server and restarts it if necessary.
+        It reloads the server container every 10 seconds and checks if the time since
+        the last restart is greater than or equal to 24 hours. If so, it restarts the server.
+
+        Note: This method assumes that the `self.container` and `self.server_running`
+        attributes have been properly initialized.
+
+        Returns:
+            None
+        """
         logging.info('Starting server monitor')
-        
 
         while self.server_running:
             self.container.reload()
@@ -77,18 +132,18 @@ class MC_Server_Controller:
         logging.info(f'Difficulty: {self.difficulty}')
         logging.info(f'Version: {self.version}')
 
-        f_port: dict = {f'25565/tcp': self.port}
-        
+        f_port: dict = {'25565/tcp': self.port}
+
         f_environment: list = [
-            f'EULA=TRUE',
+            'EULA=TRUE',
             f'JVM_OPTS=-Xms1G -Xmx{self.max_ram}',
             f'HARDCORE={self.hardcore}',
             f'DIFFICULTY={self.difficulty}',
         ]
 
-        f_port.update({f'25575/tcp': 25575})
-        f_environment.append(f'RCON_ENABLED=true')
-        f_environment.append(f'RCON_PASSWORD={self.rcon}')
+        f_port.update({'25575/tcp': 25575})
+        f_environment.append('RCON_ENABLED=true')
+        f_environment.append('RCON_PASSWORD={self.rcon}')
 
         self.container = self.client.containers.run(
             'itzg/minecraft-server',
@@ -98,13 +153,13 @@ class MC_Server_Controller:
             environment=f_environment,
             volumes={self.volumes:  {'bind': '/data', 'mode': 'rw'}},
         )
-        
+
         self.__check_server_online()
 
         logging.info(f'Minecraft server started with container ID: {self.container.id}')
 
         self.server_running = True
-        
+
     def restart_server(self):
         logging.info("Restarting server Soon")
         if self.server_running:
@@ -136,12 +191,12 @@ class MC_Server_Controller:
             self.send_command("say !! The server will reset 5 seconds !!")
 
             time.sleep(5)
-            
+
             self.send_command("say !! The server is being shut down !!") 
             self.send_command("say !! It will restart in a few moments !!")
 
             time.sleep(3)
-            
+
             logging.info("Server shutdown beginning")
 
             self.container.stop()
@@ -171,20 +226,19 @@ class MC_Server_Controller:
             with MCRcon('0.0.0.0', 'super', 25575, timeout=10) as client:
                 response = client.command(command)
                 logging.debug(f'Message Response: {response}')
-        except:
-            logging.error(f'Command Failed {command}')
+        except Exception as e:
+            logging.error(f'Command Failed {command}, {e}')
             return 'failed'
-        
+
         return response
-    
+
     def __check_server_online(self):
         response = self.send_command("say hi")
 
         while response == 'failed':
             time.sleep(6)
             response = self.send_command("say hi")
-        return
-    
+
     def __await_status(self, status):
         logging.info(f'Awaiting status: {status}')
         while self.container.status != status:
@@ -215,8 +269,12 @@ def set_up_logging(level_str, log_file_size=1):
     # logging.getLogger().addHandler(stream_handler)
 
     # Add a rotating file handler to limit the log file size
-    file_handler = RotatingFileHandler('server.log', maxBytes=1024*1024*log_file_size, backupCount=5)
-    file_handler.setLevel(logging_level)
+    file_handler = RotatingFileHandler(
+        'server.log',
+        maxBytes=1024*1024*log_file_size,
+        backupCount=5)
+    file_handler.setLevel(logging_level
+    )
     file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
 
     logging.getLogger().addHandler(file_handler)
@@ -224,27 +282,52 @@ def set_up_logging(level_str, log_file_size=1):
     # Add the file handler to the root logger
 
     # logging.basicConfig(level=logging_level)
-    return
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Start Minecraft server with Docker')
     parser.add_argument('--max-ram', default='2G', help='Maximum RAM for the server')
     parser.add_argument('--port', '-p', default=25565, type=int, help='Port to run the server on')
-    parser.add_argument('--rcon', default='super', type=str, help='Password for the RCON for the server. Default leave RCON off.')
+    parser.add_argument(
+        '--rcon',
+        default='super',
+        type=str,
+        help='Password for the RCON for the server. Default leave RCON off.'
+    )
     parser.add_argument('--volumes', '-v', help='List of volumes to mount to the server')
-    parser.add_argument('--hardcore', default=False, type=bool, help='Enable hardcore mode for the server. Default is false.')
-    parser.add_argument('--difficulty', default=2, type=int, help='Set the difficulty for the server using ints (easy 1, medium 2, hard 3). Default is normal (2).')
+    parser.add_argument(
+        '--hardcore',
+        default=False,
+        type=bool,
+        help='Enable hardcore mode for the server. Default is false.'
+    )
+    parser.add_argument(
+        '--difficulty',
+        default=2,
+        type=int,
+        help='Set the difficulty for the server using ints \
+        (easy 1, medium 2, hard 3). Default is normal (2).'
+    )
     parser.add_argument('--version', default='latest', help='Minecraft server version')
     parser.add_argument('--name', '-n', default='minecraft-server', help='Minecraft server name')
-    parser.add_argument('--log-level', '-l', default=None, help='Set the logging level for the server')
-    parser.add_argument('--log-file-size', default=2, type=int, help='Set the max size of the log file in MB')
+    parser.add_argument(
+        '--log-level',
+        '-l',
+        default=None,
+        help='Set the logging level for the server'
+    )
+    parser.add_argument(
+        '--log-file-size',
+        default=2,
+        type=int,
+        help='Set the max size of the log file in MB'
+    )
 
-    if parser.parse_args().volumes == None:
+    if parser.parse_args().volumes is None:
         parser.error('Please provide a volume to mount to the server')
 
     set_up_logging(parser.parse_args().log_level, parser.parse_args().log_file_size)
 
-    controller = MC_Server_Controller(
+    controller = McServerController(
         parser.parse_args().name,
         parser.parse_args().max_ram,
         parser.parse_args().port,
