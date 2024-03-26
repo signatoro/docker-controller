@@ -219,9 +219,11 @@ def set_up_logging(level_str, log_file_size=1):
     file_handler.setLevel(logging_level)
     file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
 
+    logging.getLogger().addHandler(file_handler)
+
     # Add the file handler to the root logger
 
-    logging.basicConfig(level=logging_level)
+    # logging.basicConfig(level=logging_level)
     return
 
 if __name__ == "__main__":
