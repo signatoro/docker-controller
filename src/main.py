@@ -1,3 +1,4 @@
+import os
 import time
 import docker
 import argparse
@@ -6,13 +7,13 @@ import shutil
 from logging.handlers import RotatingFileHandler
 from docker.models.containers import Container
 from mcrcon import MCRcon
-import sys
-
 
 class MC_Server_Controller:
 
     container: Container = None
-    def __init__(self, name, max_ram, port, rcon, volumes, hardcore, difficulty, version):
+    def __init__(self, name, max_ram, port, rcon, volumes, hardcore, difficulty, version, take_new):
+
+
         self.name = name
         self.max_ram = max_ram
         self.port = port
@@ -26,7 +27,7 @@ class MC_Server_Controller:
         self.client = docker.from_env()
         self.last_restart_time = time.time()
         
-        self.start_docker_container()
+        self.start_docker_container(take_new=take_new)
     
     def run(self):
         logging.info('Starting server monitor')
@@ -43,22 +44,29 @@ class MC_Server_Controller:
                 self.restart_server()
                 self.last_restart_time = current_time
 
-
-    def start_docker_container(self):
+    def start_docker_container(self, take_new=False):
         logging.info('Starting server')
 
         if self.client.containers.list(all=True, filters={'name': self.name}):
+
             logging.info(f'Container {self.name} exists')
             self.container = self.client.containers.get(self.name)
+
+
+            self.__check_environment(take_new)
+
+
             if self.container.status == 'exited':
                 logging.debug(f'Container {self.name} is stopped. starting...')
                 self.container.start()
                 self.__check_server_online()
-                self.server_running = True            
+                self.server_running = True
+
             elif self.container.status == 'running':
                 logging.debug(f'Container {self.name} is already running')
                 self.server_running = True 
-                self.run()  
+                self.run()
+
             else:
                 logging.error(f'!! Unknown Status !! Container status: {self.container.status}')
                 raise Exception(f'!! Unknown Status !! Container status: {self.container.status}')
@@ -66,6 +74,43 @@ class MC_Server_Controller:
             logging.info(f'Container does not exist creating {self.name}')
             self.create_docker_container()
 
+    def __check_environment(self, take_new):
+        logging.debug('Checking environment variables')
+        environment = self.container.attrs['Config']['Env']
+        volumes = self.container.attrs['HostConfig']['Binds']
+
+        if not take_new:
+            if volumes != [f'{self.volumes}:/data:rw']:
+                logging.info(f'Volumes {volumes} are different than already set.')
+                logging.warning('Restart Program server with --take-new (-t) to apply new changes to the container')
+
+            for env in environment:
+                if env.startswith('EULA=') and env != 'EULA=TRUE' or \
+                env.startswith('JVM_OPTS=') and env != f'JVM_OPTS=-Xms1G -Xmx{self.max_ram}' or\
+                env.startswith('HARDCORE=') and env != f'HARDCORE={self.hardcore}' or \
+                env.startswith('DIFFICULTY=') and env != f'DIFFICULTY={self.difficulty}' or \
+                env.startswith('RCON_ENABLED=') and env != 'RCON_ENABLED=true' or \
+                env.startswith('RCON_PASSWORD=') and env != f'RCON_PASSWORD={self.rcon}':
+                    logging.info(f'Environment variable {env} are different than already set.')
+                    logging.warning('Restart Program server with --take-new (-t) to apply new changes to the container')
+        else:
+            logging.info('Applying new changes to the container')
+
+            logging.debug(f'Current Environment: m{environment}')
+            logging.debug(f'Current Volumes: {volumes}')
+
+            logging.debug('New Environment:')
+            for attr, value in self.__dict__.items():
+                logging.debug(f'{attr}: {value}')
+            logging.debug(f'Volumes: {self.volumes}')
+
+            if self.container.status == 'running':
+                self.container.stop()
+                self.__await_status('exited')
+
+            self.container.remove()
+
+            self.create_docker_container()
 
     def create_docker_container(self):
         logging.info('Starting Minecraft server with the following parameters:')
@@ -87,7 +132,7 @@ class MC_Server_Controller:
         ]
 
         f_port.update({f'25575/tcp': 25575})
-        f_environment.append(f'RCON_ENABLED=true')
+        f_environment.append('RCON_ENABLED=true')
         f_environment.append(f'RCON_PASSWORD={self.rcon}')
 
         self.container = self.client.containers.run(
@@ -98,8 +143,10 @@ class MC_Server_Controller:
             environment=f_environment,
             volumes={self.volumes:  {'bind': '/data', 'mode': 'rw'}},
         )
+
         
         self.__check_server_online()
+        self.__await_status('running')
 
         logging.info(f'Minecraft server started with container ID: {self.container.id}')
 
@@ -206,25 +253,12 @@ def set_up_logging(level_str, log_file_size=1):
 
     logging.basicConfig(level=logging_level, format='%(asctime)s - %(levelname)s - %(message)s')
 
-    # # Create a stream handler to print logs to the terminal
-    # stream_handler = logging.StreamHandler(sys.stdout)
-    # stream_handler.setLevel(logging_level)
-    # stream_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
-
-    # # Add the stream handler to the root logger
-    # logging.getLogger().addHandler(stream_handler)
-
     # Add a rotating file handler to limit the log file size
     file_handler = RotatingFileHandler('server.log', maxBytes=1024*1024*log_file_size, backupCount=5)
     file_handler.setLevel(logging_level)
     file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
 
     logging.getLogger().addHandler(file_handler)
-
-    # Add the file handler to the root logger
-
-    # logging.basicConfig(level=logging_level)
-    return
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Start Minecraft server with Docker')
@@ -238,11 +272,22 @@ if __name__ == "__main__":
     parser.add_argument('--name', '-n', default='minecraft-server', help='Minecraft server name')
     parser.add_argument('--log-level', '-l', default=None, help='Set the logging level for the server')
     parser.add_argument('--log-file-size', default=2, type=int, help='Set the max size of the log file in MB')
+    parser.add_argument('--take-new', '-t', default=False, type=bool, help='Apply new changes to the container')
 
+    set_up_logging(parser.parse_args().log_level, parser.parse_args().log_file_size)
+
+    if parser.parse_args().take_new:
+        logging.warning('!! Applying new changes to the container !!')
+        logging.warning('THIS WILL COMPLETELY REMOVE THE OLD CONTAINER AND CREATE A NEW ONE.')
+
+        print ('Do you wish to proceed? (y/n)')
+        if input().lower() != 'y':
+            exit()
+    
     if parser.parse_args().volumes == None:
         parser.error('Please provide a volume to mount to the server')
 
-    set_up_logging(parser.parse_args().log_level, parser.parse_args().log_file_size)
+    
 
     controller = MC_Server_Controller(
         parser.parse_args().name,
@@ -252,6 +297,8 @@ if __name__ == "__main__":
         parser.parse_args().volumes,
         parser.parse_args().hardcore,
         parser.parse_args().difficulty,
-        parser.parse_args().version
+        parser.parse_args().version,
+        parser.parse_args().take_new
     )
+    logging.info(f'Pid: {os.getpid()}')
     controller.run()
