@@ -32,7 +32,7 @@ class MC_Server_Controller:
     
     def run(self):
         logging.info('Starting server monitor')
-        logging.info(f'Pid: {os.getpid()}')
+        logging.info(f'Pid 2: {os.getpid()}')
         
 
         while self.server_running:
@@ -262,6 +262,8 @@ def set_up_logging(level_str, log_file_size=1):
 
     logging.getLogger().addHandler(file_handler)
 
+    return file_handler
+
 
 def main(parser):
     # logging.info(f'Pif: {os.getpid()}')
@@ -294,7 +296,7 @@ if __name__ == "__main__":
     parser.add_argument('--log-file-size', default=2, type=int, help='Set the max size of the log file in MB')
     parser.add_argument('--take-new', '-t', default=False, type=bool, help='Apply new changes to the container')
 
-    set_up_logging(parser.parse_args().log_level, parser.parse_args().log_file_size)
+    fh = set_up_logging(parser.parse_args().log_level, parser.parse_args().log_file_size)
 
     if parser.parse_args().take_new:
         logging.warning('!! Applying new changes to the container !!')
@@ -309,8 +311,12 @@ if __name__ == "__main__":
 
     logging.info(f'Pid 1: {os.getpid()}')
 
+    # print (logging.root.handlers[0].stream)
+
     if parser.parse_args().daemon:
-        with daemon.DaemonContext():
+        with daemon.DaemonContext(
+            files_preserve=[fh.stream.fileno()]
+        ):
             main(parser)
     else:
         main(parser)
