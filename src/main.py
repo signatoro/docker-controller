@@ -309,10 +309,6 @@ if __name__ == "__main__":
     if parser.parse_args().volumes == None:
         parser.error('Please provide a volume to mount to the server')
 
-    logging.info(f'Pid 1: {os.getpid()}')
-
-    # print (logging.root.handlers[0].stream)
-
     if parser.parse_args().daemon:
         with daemon.DaemonContext(
             files_preserve=[fh.stream.fileno()]
