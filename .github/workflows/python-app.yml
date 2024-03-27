@@ -28,7 +28,7 @@ jobs:
         #   run: pytest
 
         - name: Lint code
-          run: pylint --rcfile .pylintrc --fail-under=80 src/main.py
+          run: pylint --rcfile .pylintrc --fail-under=8.0 src/main.py
 
         - name: Build executable
           run: pyinstaller --onefile src/main.py -n mc_server_controller
