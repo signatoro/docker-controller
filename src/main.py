@@ -4,6 +4,7 @@ import docker
 import argparse
 import logging
 import shutil
+import daemon
 from logging.handlers import RotatingFileHandler
 from docker.models.containers import Container
 from mcrcon import MCRcon
@@ -31,6 +32,7 @@ class MC_Server_Controller:
     
     def run(self):
         logging.info('Starting server monitor')
+        logging.info(f'Pid: {os.getpid()}')
         
 
         while self.server_running:
@@ -260,8 +262,26 @@ def set_up_logging(level_str, log_file_size=1):
 
     logging.getLogger().addHandler(file_handler)
 
+
+def main(parser):
+    # logging.info(f'Pif: {os.getpid()}')
+    controller = MC_Server_Controller(
+        parser.parse_args().name,
+        parser.parse_args().max_ram,
+        parser.parse_args().port,
+        parser.parse_args().rcon,
+        parser.parse_args().volumes,
+        parser.parse_args().hardcore,
+        parser.parse_args().difficulty,
+        parser.parse_args().version,
+        parser.parse_args().take_new
+    )
+
+    controller.run()
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Start Minecraft server with Docker')
+    parser.add_argument('-d', '--daemon',action='store_true', help='Run the server in daemon mode')
     parser.add_argument('--max-ram', default='2G', help='Maximum RAM for the server')
     parser.add_argument('--port', '-p', default=25565, type=int, help='Port to run the server on')
     parser.add_argument('--rcon', default='super', type=str, help='Password for the RCON for the server. Default leave RCON off.')
@@ -287,18 +307,10 @@ if __name__ == "__main__":
     if parser.parse_args().volumes == None:
         parser.error('Please provide a volume to mount to the server')
 
-    
+    logging.info(f'Pid 1: {os.getpid()}')
 
-    controller = MC_Server_Controller(
-        parser.parse_args().name,
-        parser.parse_args().max_ram,
-        parser.parse_args().port,
-        parser.parse_args().rcon,
-        parser.parse_args().volumes,
-        parser.parse_args().hardcore,
-        parser.parse_args().difficulty,
-        parser.parse_args().version,
-        parser.parse_args().take_new
-    )
-    logging.info(f'Pid: {os.getpid()}')
-    controller.run()
+    if parser.parse_args().daemon:
+        with daemon.DaemonContext():
+            main(parser)
+    else:
+        main(parser)
