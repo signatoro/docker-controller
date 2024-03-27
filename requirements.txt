@@ -1,4 +1,6 @@
 mcrcon==0.7.0
 docker
 python-daemon
-
+pylint
+pyinstaller
+pytest
