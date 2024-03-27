@@ -27,27 +27,8 @@ jobs:
         # - name: Run tests
         #   run: pytest
 
-        - name: Run pylint
-          id: pylint
-          run: pylint --rcfile .pylintrc src/main.py | tee pylint_output.txt
-
-        - name: Parse Pylint score
-          id: parse_pylint_score
-          run: |
-            pylint_output=$(cat pylint_output.txt)
-            pylint_score=$(echo "$pylint_output" | awk '/Your code has been rated at/ {print $7}')
-            echo "::set-output name=pylint_score::$pylint_score"
-  
-        - name: Check Pylint score
-          run: |
-            pylint_score="${{ steps.parse_pylint_score.outputs.pylint_score }}"
-            if (( $(echo "$pylint_score >= 80" | bc -l) )); then
-              echo "Pylint score is $pylint_score, which meets the threshold."
-              exit 0  # Success
-            else
-              echo "Pylint score is $pylint_score, which does not meet the threshold."
-              exit 1  # Failure
-            fi
+        - name: Lint code
+          run: pylint --rcfile .pylintrc --fail-under=80 src/main.py
 
         - name: Build executable
           run: pyinstaller --onefile src/main.py -n mc_server_controller
