@@ -41,3 +41,5 @@ jobs:
             message: Add generated executable
             add: 'dist/mc_server_controller'
             push: true
+
+            
