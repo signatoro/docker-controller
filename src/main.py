@@ -35,12 +35,14 @@ Methods:
 - __check_server_online(self): Checks if the server is online and ready to accept commands.
 - __await_status(self, status): Waits for the container status to reach the specified status.
 """
+import os
 import time
 import shutil
 import logging
 import argparse
 from logging.handlers import RotatingFileHandler
 
+import daemon
 import docker
 from mcrcon import MCRcon
 from docker.models.containers import Container
@@ -78,8 +80,8 @@ class McServerController:
     """
 
     container: Container = None
+    def __init__(self, name, max_ram, port, rcon, volumes, hardcore, difficulty, version, take_new):
 
-    def __init__(self, name, max_ram, port, rcon, volumes, hardcore, difficulty, version):
         """
         Initializes the Minecraft Server Controller.
 
@@ -105,7 +107,8 @@ class McServerController:
         self.server_running = False
         self.client = docker.from_env()
         self.last_restart_time = time.time()
-        self.start_docker_container()
+
+        self.start_docker_container(take_new=take_new)
 
     def run(self):
         """
@@ -122,6 +125,8 @@ class McServerController:
             None
         """
         logging.info('Starting server monitor')
+        logging.info(f'Pid 2: {os.getpid()}')
+
 
         while self.server_running:
             self.container.reload()
@@ -135,8 +140,7 @@ class McServerController:
                 self.restart_server()
                 self.last_restart_time = current_time
 
-
-    def start_docker_container(self):
+    def start_docker_container(self, take_new=False):
         """
         Starts the Docker container for the Minecraft server.
 
@@ -157,17 +161,25 @@ class McServerController:
         logging.info('Starting server')
 
         if self.client.containers.list(all=True, filters={'name': self.name}):
+
             logging.info(f'Container {self.name} exists')
             self.container = self.client.containers.get(self.name)
+
+
+            self.__check_environment(take_new)
+
+
             if self.container.status == 'exited':
                 logging.debug(f'Container {self.name} is stopped. starting...')
                 self.container.start()
                 self.__check_server_online()
                 self.server_running = True
+
             elif self.container.status == 'running':
                 logging.debug(f'Container {self.name} is already running')
-                self.server_running = True
+                self.server_running = True 
                 self.run()
+
             else:
                 logging.error(f'!! Unknown Status !! Container status: {self.container.status}')
                 raise Exception(f'!! Unknown Status !! Container status: {self.container.status}')
@@ -175,6 +187,45 @@ class McServerController:
             logging.info(f'Container does not exist creating {self.name}')
             self.create_docker_container()
 
+    def __check_environment(self, take_new):
+        logging.debug('Checking environment variables')
+        environment = self.container.attrs['Config']['Env']
+        volumes = self.container.attrs['HostConfig']['Binds']
+
+        if not take_new:
+            if volumes != [f'{self.volumes}:/data:rw']:
+                logging.info(f'Volumes {volumes} are different than already set.')
+                logging.warning('Restart Program server with --take-new \
+                                (-t) to apply new changes to the container')
+
+            for env in environment:
+                if env.startswith('EULA=') and env != 'EULA=TRUE' or \
+                env.startswith('JVM_OPTS=') and env != f'JVM_OPTS=-Xms1G -Xmx{self.max_ram}' or\
+                env.startswith('HARDCORE=') and env != f'HARDCORE={self.hardcore}' or \
+                env.startswith('DIFFICULTY=') and env != f'DIFFICULTY={self.difficulty}' or \
+                env.startswith('RCON_ENABLED=') and env != 'RCON_ENABLED=true' or \
+                env.startswith('RCON_PASSWORD=') and env != f'RCON_PASSWORD={self.rcon}':
+                    logging.info(f'Environment variable {env} are different than already set.')
+                    logging.warning('Restart Program server with --take-new \
+                                    (-t) to apply new changes to the container')
+        else:
+            logging.info('Applying new changes to the container')
+
+            logging.debug(f'Current Environment: m{environment}')
+            logging.debug(f'Current Volumes: {volumes}')
+
+            logging.debug('New Environment:')
+            for attr, value in self.__dict__.items():
+                logging.debug(f'{attr}: {value}')
+            logging.debug(f'Volumes: {self.volumes}')
+
+            if self.container.status == 'running':
+                self.container.stop()
+                self.__await_status('exited')
+
+            self.container.remove()
+
+            self.create_docker_container()
 
     def create_docker_container(self):
         """
@@ -207,7 +258,7 @@ class McServerController:
 
         f_port.update({'25575/tcp': 25575})
         f_environment.append('RCON_ENABLED=true')
-        f_environment.append('RCON_PASSWORD={self.rcon}')
+        f_environment.append(f'RCON_PASSWORD={self.rcon}')
 
         self.container = self.client.containers.run(
             'itzg/minecraft-server',
@@ -218,7 +269,9 @@ class McServerController:
             volumes={self.volumes:  {'bind': '/data', 'mode': 'rw'}},
         )
 
+
         self.__check_server_online()
+        self.__await_status('running')
 
         logging.info(f'Minecraft server started with container ID: {self.container.id}')
 
@@ -391,8 +444,28 @@ def set_up_logging(level_str, log_file_size=1):
 
     logging.getLogger().addHandler(file_handler)
 
+    return file_handler
+
+
+def main(parser: argparse.ArgumentParser):
+    # logging.info(f'Pif: {os.getpid()}')
+    controller = McServerController(
+        parser.parse_args().name,
+        parser.parse_args().max_ram,
+        parser.parse_args().port,
+        parser.parse_args().rcon,
+        parser.parse_args().volumes,
+        parser.parse_args().hardcore,
+        parser.parse_args().difficulty,
+        parser.parse_args().version,
+        parser.parse_args().take_new
+    )
+
+    controller.run()
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Start Minecraft server with Docker')
+    parser.add_argument('-d', '--daemon',action='store_true', help='Run the server in daemon mode')
     parser.add_argument('--max-ram', default='2G', help='Maximum RAM for the server')
     parser.add_argument('--port', '-p', default=25565, type=int, help='Port to run the server on')
     parser.add_argument(
@@ -429,20 +502,31 @@ if __name__ == "__main__":
         type=int,
         help='Set the max size of the log file in MB'
     )
+    parser.add_argument(
+        '--take-new',
+        '-t',
+        default=False,
+        type=bool,
+        help='Apply new changes to the container'
+    )
+
+    fh = set_up_logging(parser.parse_args().log_level, parser.parse_args().log_file_size)
+
+    if parser.parse_args().take_new:
+        logging.warning('!! Applying new changes to the container !!')
+        logging.warning('THIS WILL COMPLETELY REMOVE THE OLD CONTAINER AND CREATE A NEW ONE.')
+
+        print ('Do you wish to proceed? (y/n)')
+        if input().lower() != 'y':
+            exit()
 
     if parser.parse_args().volumes is None:
         parser.error('Please provide a volume to mount to the server')
 
-    set_up_logging(parser.parse_args().log_level, parser.parse_args().log_file_size)
-
-    controller = McServerController(
-        parser.parse_args().name,
-        parser.parse_args().max_ram,
-        parser.parse_args().port,
-        parser.parse_args().rcon,
-        parser.parse_args().volumes,
-        parser.parse_args().hardcore,
-        parser.parse_args().difficulty,
-        parser.parse_args().version
-    )
-    controller.run()
+    if parser.parse_args().daemon:
+        with daemon.DaemonContext(
+            files_preserve=[fh.stream.fileno()]
+        ):
+            main(parser)
+    else:
+        main(parser)
