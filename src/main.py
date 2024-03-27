@@ -254,6 +254,7 @@ class McServerController:
             f'JVM_OPTS=-Xms1G -Xmx{self.max_ram}',
             f'HARDCORE={self.hardcore}',
             f'DIFFICULTY={self.difficulty}',
+            'TZ=America/New_York',
         ]
 
         f_port.update({'25575/tcp': 25575})
