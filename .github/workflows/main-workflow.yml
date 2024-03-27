@@ -33,11 +33,10 @@ jobs:
         # - name: Move executable to dist folder
         #   run: mv dist/your_python_file /path/to/your/repo/dist/
 
-        - name: Commit and push changes
-          uses: EndBug/add-and-commit@v7
-          with:
-            author_name: GitHub Actions
-            author_email: actions@github.com
-            message: Add generated executable
-            add: 'dist/mc_server_controller'
-            push: true
+        - name: Commit changes
+          run: |
+                git config --global user.name "GitHub Action"
+                git config --global user.email "action@github.com"
+                git add .
+                git commit -m "Add executable to dist folder"
+                git push
