@@ -7,8 +7,7 @@ import shutil
 import logging
 import argparse
 from logging.handlers import RotatingFileHandler
-
-import daemon
+import daemonize
 import docker
 from mcrcon import MCRcon
 from docker.models.containers import Container
@@ -533,9 +532,7 @@ if __name__ == "__main__":
         parser.error('Please provide a volume to mount to the server')
 
     if parser.parse_args().daemon:
-        with daemon.DaemonContext(
-            files_preserve=[fh.stream.fileno()]
-        ):
+        with daemonize.Daemonize(stdout=fh.stream, stderr=fh.stream):
             main(parser)
     else:
         main(parser)
