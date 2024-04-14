@@ -4,3 +4,5 @@ python-daemon
 pylint
 pyinstaller
 pytest
+pandas
+matplotlib

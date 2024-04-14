@@ -1,40 +1,6 @@
-"""
-This module contains the implementation of a Minecraft Server Controller.
 
-The Minecraft Server Controller is responsible for managing a Minecraft server
-running in a Docker container. It provides methods for starting, stopping, and
-restarting the server, as well as performing backups and sending commands to the server.
-
-Classes:
-- McServerController: A class representing a Minecraft Server Controller.
-
-Attributes:
-- name (str): The name of the Minecraft server container.
-- max_ram (str): The maximum amount of RAM allocated to the server.
-- port (int): The port number for the server.
-- rcon (str): The RCON password for the server.
-- volumes (str): The path to the server data volume.
-- hardcore (bool): Whether hardcore mode is enabled.
-- difficulty (str): The difficulty level of the server.
-- version (str): The version of Minecraft server to run.
-- container (Container): The Docker container object representing the Minecraft server.
-- server_running (bool): Indicates whether the server is currently running.
-- client (DockerClient): The Docker client object for interacting with Docker.
-- last_restart_time (float): The timestamp of the last server restart.
-
-Methods:
-- __init__(self, name, max_ram, port, rcon, volumes, hardcore, difficulty, version): 
-    Initializes the Minecraft Server Controller.
-- run(self): Starts the server monitor loop.
-- start_docker_container(self): Starts the Docker container for the Minecraft server.
-- create_docker_container(self): Creates a new Docker container for the Minecraft server.
-- restart_server(self): Restarts the Minecraft server.
-- shutdown_server(self): Shuts down the Minecraft server.
-- backup_server_folder(self): Performs a backup of the server folder.
-- send_command(self, command): Sends a command to the Minecraft server via RCON.
-- __check_server_online(self): Checks if the server is online and ready to accept commands.
-- __await_status(self, status): Waits for the container status to reach the specified status.
-"""
+import csv
+import datetime
 import os
 import time
 import shutil
@@ -58,7 +24,7 @@ class McServerController:
     - rcon (str): The RCON password for the server.
     - volumes (str): The path to the server data volume.
     - hardcore (bool): Whether hardcore mode is enabled.
-    - difficulty (str): The difficulty level of the server.
+    - difficulty (str): The difficultypy level of the server.
     - version (str): The version of Minecraft server to run.
     - container (Container): The Docker container object representing the Minecraft server.
     - server_running (bool): Indicates whether the server is currently running.
@@ -130,15 +96,54 @@ class McServerController:
 
         while self.server_running:
             self.container.reload()
-            time.sleep(10)
+
+            raw_results = self.container.stats(stream=False)
+            
+            csv_results = self.__generate_data_row(raw_results)
+
+            with open('data.csv', 'a', newline='') as csvfile:
+                writer = csv.writer(csvfile)
+                writer.writerow(csv_results)
 
             current_time = time.time()
+
 
             logging.debug(f'current time: {current_time} \
                           last restart time: {self.last_restart_time}')
             if current_time - self.last_restart_time >= 24 * 60 * 60:
                 self.restart_server()
                 self.last_restart_time = current_time
+            
+            time.sleep(10)
+    
+    def __generate_data_row(self, container_stats) -> tuple:
+
+        time_stamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        total_cpu_usage = container_stats['cpu_stats']['cpu_usage']['total_usage'] - container_stats['precpu_stats']['cpu_usage']['total_usage']
+        # Get the total system CPU time used
+        total_system_cpu_usage = container_stats['cpu_stats']['system_cpu_usage'] - container_stats['precpu_stats']['system_cpu_usage']
+        # Get the number of online CPUs
+        online_cpus = container_stats['cpu_stats']['online_cpus']
+        # Calculate the CPU usage percentage
+        cpu_percent = (total_cpu_usage / total_system_cpu_usage) * online_cpus * 100
+        # Round the result to two decimal places
+        cpu_percent = round(cpu_percent, 2)
+
+        ram_usage = container_stats['memory_stats']['usage']
+        ram_limit = container_stats['memory_stats']['limit']
+        ram_percent = (ram_usage / ram_limit) * 100
+
+        ram_percent = round(ram_percent, 2)
+
+        net_rx_bytes = container_stats['networks']['eth0']['rx_bytes']
+        net_tx_bytes = container_stats['networks']['eth0']['tx_bytes']
+        blk_read_bytes = sum(entry['value'] for entry in container_stats['blkio_stats']['io_service_bytes_recursive'] if entry['op'] == 'read')
+        blk_write_bytes = sum(entry['value'] for entry in container_stats['blkio_stats']['io_service_bytes_recursive'] if entry['op'] == 'write')
+
+        data_row = [time_stamp, cpu_percent, ram_percent, net_rx_bytes, net_tx_bytes, blk_read_bytes, blk_write_bytes]
+
+        return data_row
 
     def start_docker_container(self, take_new=False):
         """
@@ -254,6 +259,7 @@ class McServerController:
             f'JVM_OPTS=-Xms1G -Xmx{self.max_ram}',
             f'HARDCORE={self.hardcore}',
             f'DIFFICULTY={self.difficulty}',
+            f'TZ=America/New_York',
         ]
 
         f_port.update({'25575/tcp': 25575})
@@ -361,9 +367,12 @@ class McServerController:
         Returns:
             None
         """
-        logging.info("Backing up server folder")
-        shutil.make_archive('server_backup', 'zip', self.volumes)
-        logging.info("Backup complete")
+        try:
+            logging.info("Backing up server folder")
+            shutil.make_archive('server_backup', 'zip', self.volumes)
+            logging.info("Backup complete")
+        except Exception as e:
+            logging.error(f"Backup failed: {e}")
 
 
     def send_command(self, command):
