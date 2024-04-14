@@ -91,7 +91,6 @@ class McServerController:
 
         while self.server_running:
             self.container.reload()
-            
 
             raw_results = self.container.stats(stream=False)
             
