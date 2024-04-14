@@ -2,9 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime
 import argparse
-
-
-
+import mplcursors
 
 def main(path):
 
@@ -32,7 +30,10 @@ def main(path):
     plt.ylabel('CPU Usage (%)')
     plt.title('CPU Usage over Time')
     plt.legend()
-    plt.savefig('./graphs/cpu_usage.png')
+    plt.ylim(0, 100)
+    plt.grid(True, linestyle='--', color='gray', linewidth=0.5)
+    mplcursors.cursor(hover=True).connect('add', lambda sel: sel.annotation.set_text(f'{sel.artist.get_label()}: {sel.target[1]}%'))
+    plt.savefig('cpu_usage.png')
     plt.show()
 
     # Plot RAM Usage over time
@@ -41,7 +42,10 @@ def main(path):
     plt.ylabel('RAM Usage (%)')
     plt.title('RAM Usage over Time')
     plt.legend()
-    plt.savefig('./graphs/ram_usage.png')
+    plt.ylim(0, 100)
+    plt.grid(True, linestyle='--', color='gray', linewidth=0.5)
+    mplcursors.cursor(hover=True).connect('add', lambda sel: sel.annotation.set_text(f'{sel.artist.get_label()}: {sel.target[1]}%'))
+    plt.savefig('ram_usage.png')
     plt.show()
 
     # Plot Network I/O over time
@@ -51,7 +55,9 @@ def main(path):
     plt.ylabel('Network I/O (KB)')
     plt.title('Network I/O over Time')
     plt.legend()
-    plt.savefig('./graphs/network_io.png')
+    plt.grid(True, linestyle='--', color='gray', linewidth=0.5)
+    mplcursors.cursor(hover=True).connect('add', lambda sel: sel.annotation.set_text(f'{sel.artist.get_label()}: {sel.target[1]}%'))
+    plt.savefig('network_io.png')
     plt.show()
 
     # Plot Block I/O over time
@@ -61,7 +67,9 @@ def main(path):
     plt.ylabel('Block I/O (MB)')
     plt.title('Block I/O over Time')
     plt.legend()
-    plt.savefig('./graphs/block_io.png')
+    plt.grid(True, linestyle='--', color='gray', linewidth=0.5)
+    mplcursors.cursor(hover=True).connect('add', lambda sel: sel.annotation.set_text(f'{sel.artist.get_label()}: {sel.target[1]}%'))
+    plt.savefig('block_io.png')
     plt.show()
 
 if __name__ == "__main__":

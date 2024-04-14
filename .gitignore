@@ -8,5 +8,6 @@ data/*
 
 .vscode/
 *.zip
+*.csv
 
 build/

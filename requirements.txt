@@ -3,3 +3,5 @@ docker
 pylint
 pyinstaller
 pytest
+pandas
+matplotlib
