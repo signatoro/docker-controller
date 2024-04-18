@@ -2,6 +2,7 @@ import React from 'react';
 import PercentageGraph from './PercentageGraph';
 import DiskGraph from './DiskGraph';
 import { ThemeProvider, useTheme } from './ThemeContext';
+import Graph from './Graph';
 
 const App: React.FC = () => {
   return (
@@ -9,6 +10,9 @@ const App: React.FC = () => {
     //   <ThemedApp />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gridGap: '20px', padding: '20px', height: '100vh' }}>
         <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+          <Graph/>
+        </div>
+        {/* <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
           <PercentageGraph endpoint='http://127.0.0.1:8000/cpu-data' title='CPU Data'/>
         </div>
         <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
@@ -19,7 +23,7 @@ const App: React.FC = () => {
         </div>
         <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
           <DiskGraph endpoint='http://127.0.0.1:8000/net-data' title='Block Data'/>
-        </div>
+        </div> */}
       </div>
     // </ThemeProvider>
   );

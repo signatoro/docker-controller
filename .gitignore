@@ -11,3 +11,5 @@ data/*
 *.csv
 
 build/
+
+node_modules/
