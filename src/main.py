@@ -110,8 +110,6 @@ class McServerController:
             logging.info(self.get_player_count())
             logging.info(self.get_players_online())
 
-
-
             current_time = time.time()
 
             logging.debug(f'current time: {current_time} \
@@ -464,6 +462,7 @@ class McServerController:
         while response == 'failed':
             time.sleep(6)
             response = self.send_command("say hi")
+        logging.info('Server is online')
 
     def __await_status(self, status):
         logging.info(f'Awaiting status: {status}')
