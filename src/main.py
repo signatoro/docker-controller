@@ -46,6 +46,8 @@ class McServerController:
     """
 
     container: Container = None
+
+    old_players: list[str] = []
     def __init__(self, name, max_ram, port, rcon, volumes, hardcore, difficulty, version, take_new):
 
         """
@@ -105,8 +107,10 @@ class McServerController:
                 writer = csv.writer(csvfile)
                 writer.writerow(csv_results)
 
-            current_time = time.time()
+            logging.info(self.get_player_count())
+            logging.info(self.get_players_online())
 
+            current_time = time.time()
 
             logging.debug(f'current time: {current_time} \
                           last restart time: {self.last_restart_time}')
@@ -115,6 +119,54 @@ class McServerController:
                 self.last_restart_time = current_time
             
             time.sleep(10)
+
+    def check_player_change(self):
+        current_players = sorted(self.get_players_online())
+        sold = sorted(self.old_players)
+
+        if current_players == sold:
+            return
+        if len(current_players) == 0:
+            return
+        
+        if len(current_players) > len(self.old_players):
+            new_players = set(current_players) - set(self.old_players)
+            print(f'{new_players} joined the Game.')
+            self.old_players = current_players
+        
+        elif len(current_players) < len(self.old_players):
+            left_players = set(self.old_players) - set(current_players)
+            print(f'{left_players} left the Game.')
+            self.old_players = current_players
+        # Same length different players
+        elif len(current_players) == len(self.old_players):
+            intersection = set(current_players).intersection(set(self.old_players))
+            if intersection == []:
+                print('intersection is empty')
+                print(f'{self.old_players} left the Game.')
+                print(f'{current_players} joined the Game.')
+                self.old_players = current_players
+            else:
+                left = list(set(self.old_players) - set(current_players))
+                joined = list(set(current_players) - set(self.old_players))
+                print(f'{left} left the Game.')
+                print(f'{joined} joined the Game.')
+
+
+    def get_player_count(self) -> str:
+        response = self.send_command('list')
+        if response == 'failed':
+            raise Exception('Server is offline')
+        return f'{response.split(":")[0].strip().split(" ")[2]}/{response.split(":")[0].strip().split(" ")[7]}'
+        
+    
+    def get_players_online(self) -> list[str]:
+        raw_response = self.send_command('list')
+        if raw_response == 'failed':
+            raise Exception('Server is offline')
+        if 'There are 0' in raw_response:
+            return []
+        return raw_response.split(':')[1].strip().split(',')
     
     def __generate_data_row(self, container_stats) -> tuple:
 
@@ -399,7 +451,7 @@ class McServerController:
                 response = client.command(command)
                 logging.debug(f'Message Response: {response}')
         except Exception as e:
-            logging.error(f'Command Failed {command}, {e}')
+            # logging.error(f'Command Failed {command}, {e}')
             return 'failed'
 
         return response
@@ -410,6 +462,7 @@ class McServerController:
         while response == 'failed':
             time.sleep(6)
             response = self.send_command("say hi")
+        logging.info('Server is online')
 
     def __await_status(self, status):
         logging.info(f'Awaiting status: {status}')

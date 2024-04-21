@@ -9,6 +9,7 @@ def main(path):
     # Read data from CSV file
     data = pd.read_csv(path, header=None, names=['Timestamp', 'CPU Usage', 'RAM Usage', 'Net RX Bytes', 'Net TX Bytes', 'Block Read Bytes', 'Block Write Bytes'])
 
+    
     # Convert timestamp column to datetime
     data['Timestamp'] = pd.to_datetime(data['Timestamp'])
 
