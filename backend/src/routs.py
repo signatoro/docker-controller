@@ -1,20 +1,11 @@
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI
 import pandas as pd
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI()
 
-# Allow all origins for CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["GET"],
-    allow_headers=["*"],
-)
+router = APIRouter()
 
-
-@app.get("/cpu-data")
+@router.get("/cpu-data")
 async def get_cpu_data():
     # Simulated CPU data
     data = pd.read_csv('/Users/couchcomfy/Code/personal/minecraft-server-controller/data.csv', header=None, names=['Timestamp', 'CPU Usage', 'RAM Usage', 'Net RX Bytes', 'Net TX Bytes', 'Block Read Bytes', 'Block Write Bytes'])
@@ -25,7 +16,7 @@ async def get_cpu_data():
     print(cpu_data)
     return cpu_data
 
-@app.get("/ram-data")
+@router.get("/ram-data")
 async def get_cpu_data():
     # Simulated CPU data
     data = pd.read_csv('/Users/couchcomfy/Code/personal/minecraft-server-controller/data.csv', header=None, names=['Timestamp', 'CPU Usage', 'RAM Usage', 'Net RX Bytes', 'Net TX Bytes', 'Block Read Bytes', 'Block Write Bytes'])
@@ -35,7 +26,7 @@ async def get_cpu_data():
     ram_data = data[['timestamp', 'percentage']].to_dict(orient='records')
     return ram_data
 
-@app.get("/net-data")
+@router.get("/net-data")
 async def get_cpu_data():
     # Simulated CPU data
     data = pd.read_csv('/Users/couchcomfy/Code/personal/minecraft-server-controller/data.csv', header=None, names=['Timestamp', 'CPU Usage', 'RAM Usage', 'Net RX Bytes', 'Net TX Bytes', 'Block Read Bytes', 'Block Write Bytes'])
@@ -46,7 +37,7 @@ async def get_cpu_data():
     net_data = data[['timestamp', 'read', 'write']].to_dict(orient='records')
     return net_data
 
-@app.get("/block-data")
+@router.get("/block-data")
 async def get_cpu_data():
     # Simulated CPU data
     data = pd.read_csv('/Users/couchcomfy/Code/personal/minecraft-server-controller/data.csv', header=None, names=['Timestamp', 'CPU Usage', 'RAM Usage', 'Net RX Bytes', 'Net TX Bytes', 'Block Read Bytes', 'Block Write Bytes'])

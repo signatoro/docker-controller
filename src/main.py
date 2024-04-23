@@ -95,11 +95,17 @@ class McServerController:
         logging.info('Starting server monitor')
         logging.info(f'Pid 2: {os.getpid()}')
 
+        # container_stream = self.container.logs(stream=True)
+        last_logged_line = ""
+
 
         while self.server_running:
+            logging.debug('Reloading container')
             self.container.reload()
 
             raw_results = self.container.stats(stream=False)
+
+            # logs_results = self.container.logs(stream=False)
             
             csv_results = self.__generate_data_row(raw_results)
 
@@ -107,8 +113,19 @@ class McServerController:
                 writer = csv.writer(csvfile)
                 writer.writerow(csv_results)
 
-            logging.info(self.get_player_count())
-            logging.info(self.get_players_online())
+            logging.debug(self.get_player_count())
+            logging.debug(self.get_players_online())
+
+            self.check_player_change()
+
+            # new_logs = logs_results.splitlines()[len(last_logged_line.splitlines()):]
+            
+            # for line in new_logs:
+            #     logging.info(line)
+            # # logging.info(logs_results)
+
+            # last_logged_line = logs_results
+
 
             current_time = time.time()
 
@@ -118,42 +135,59 @@ class McServerController:
                 self.restart_server()
                 self.last_restart_time = current_time
             
-            time.sleep(10)
+            time.sleep(5)
 
     def check_player_change(self):
+        """
+        Check for changes in the list of players online and print the players who joined or left the game.
+
+        This method compares the current list of players online with the previous list of players and
+        prints the players who joined or left the game. It also updates the previous list of players.
+
+        Returns:
+            None
+        """
         current_players = sorted(self.get_players_online())
         sold = sorted(self.old_players)
 
         if current_players == sold:
             return
-        if len(current_players) == 0:
+        if len(current_players) == 0 and len(self.old_players) == 0:
             return
         
         if len(current_players) > len(self.old_players):
             new_players = set(current_players) - set(self.old_players)
-            print(f'{new_players} joined the Game.')
+            logging.info(f'{new_players} joined the Game.')
             self.old_players = current_players
         
         elif len(current_players) < len(self.old_players):
             left_players = set(self.old_players) - set(current_players)
-            print(f'{left_players} left the Game.')
+            logging.info(f'{left_players} left the Game.')
             self.old_players = current_players
         # Same length different players
         elif len(current_players) == len(self.old_players):
             intersection = set(current_players).intersection(set(self.old_players))
             if intersection == []:
-                print('intersection is empty')
-                print(f'{self.old_players} left the Game.')
-                print(f'{current_players} joined the Game.')
+                logging.info(f'{self.old_players} left the Game.')
+                logging.info(f'{current_players} joined the Game.')
                 self.old_players = current_players
             else:
                 left = list(set(self.old_players) - set(current_players))
                 joined = list(set(current_players) - set(self.old_players))
-                print(f'{left} left the Game.')
-                print(f'{joined} joined the Game.')
+                logging.info(f'{left} left the Game.')
+                logging.info(f'{joined} joined the Game.')
 
 
     def get_player_count(self) -> str:
+        """
+        Retrieves the current player count from the server.
+
+        Returns:
+            str: The player count in the format 'current_players/maximum_players'.
+
+        Raises:
+            Exception: If the server is offline.
+        """
         response = self.send_command('list')
         if response == 'failed':
             raise Exception('Server is offline')
@@ -235,7 +269,6 @@ class McServerController:
             elif self.container.status == 'running':
                 logging.debug(f'Container {self.name} is already running')
                 self.server_running = True 
-                self.run()
 
             else:
                 logging.error(f'!! Unknown Status !! Container status: {self.container.status}')
@@ -243,6 +276,8 @@ class McServerController:
         else:
             logging.info(f'Container does not exist creating {self.name}')
             self.create_docker_container()
+        
+        self.run()
 
     def __check_environment(self, take_new):
         logging.debug('Checking environment variables')
@@ -311,6 +346,7 @@ class McServerController:
             f'JVM_OPTS=-Xms1G -Xmx{self.max_ram}',
             f'HARDCORE={self.hardcore}',
             f'DIFFICULTY={self.difficulty}',
+            f'VERSION={self.version}',
             f'TZ=America/New_York',
         ]
 
