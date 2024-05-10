@@ -311,6 +311,7 @@ class McServerController:
             f'JVM_OPTS=-Xms1G -Xmx{self.max_ram}',
             f'HARDCORE={self.hardcore}',
             f'DIFFICULTY={self.difficulty}',
+            f'VERSION={self.version}',
             f'TZ=America/New_York',
         ]
 
