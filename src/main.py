@@ -448,7 +448,7 @@ class McServerController:
         try:
             # Replace 'your_rcon_password' and 'your_minecraft_server_ip'
             # with your actual RCON password and server IP
-            with MCRcon('0.0.0.0', 'super', 25575, timeout=10) as client:
+            with MCRcon('0.0.0.0', self.rcon , 25575, timeout=10) as client:
                 response = client.command(command)
                 logging.debug(f'Message Response: {response}')
         except Exception as e:
