@@ -11,7 +11,6 @@ from src.depends import check_container, check_periodically
 def run_start():
     app = FastAPI()
 
-
     # Allow all origins for CORS
     app.add_middleware(
         CORSMiddleware,

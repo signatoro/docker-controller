@@ -72,6 +72,9 @@ class McServerController:
         self.difficulty = difficulty
         self.version = version
 
+        self.last_logged_line: str
+
+
         self.server_running = False
         self.client = docker.from_env()
         self.last_restart_time = time.time()
@@ -113,10 +116,12 @@ class McServerController:
                 writer = csv.writer(csvfile)
                 writer.writerow(csv_results)
 
-            logging.debug(self.get_player_count())
-            logging.debug(self.get_players_online())
+            self.monitor_logs()
 
-            self.check_player_change()
+            # logging.debug(self.get_player_count())
+            # logging.debug(self.get_players_online())
+
+            # self.check_player_change()
 
             # new_logs = logs_results.splitlines()[len(last_logged_line.splitlines()):]
             
@@ -177,6 +182,29 @@ class McServerController:
                 logging.info(f'{left} left the Game.')
                 logging.info(f'{joined} joined the Game.')
 
+    def monitor_logs(self):
+        """
+        Monitors the server logs for new entries.
+
+        This method continuously monitors the server logs for new entries.
+        It reads the logs line by line and prints the new entries to the console.
+
+        Returns:
+            None
+        """
+        logging.info('Checking Logs')
+        # container_stream = self.container.logs(stream=True)
+
+        # while self.server_running:
+        logs_results = self.container.logs(stream=False)
+        new_logs = logs_results.splitlines()[len(last_logged_line.splitlines()):]
+
+        for line in new_logs:
+            logging.info(line)
+
+        last_logged_line = logs_results
+
+            # time.sleep(5)
 
     def get_player_count(self) -> str:
         """
@@ -192,7 +220,6 @@ class McServerController:
         if response == 'failed':
             raise Exception('Server is offline')
         return f'{response.split(":")[0].strip().split(" ")[2]}/{response.split(":")[0].strip().split(" ")[7]}'
-        
     
     def get_players_online(self) -> list[str]:
         raw_response = self.send_command('list')
