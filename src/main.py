@@ -111,6 +111,7 @@ class McServerController:
         while self.server_running:
             logging.debug('Reloading container')
             self.container.reload()
+            current_time = datetime.now(self.timezone)
 
             raw_results = self.container.stats(stream=False)
 
@@ -122,16 +123,10 @@ class McServerController:
                 writer = csv.writer(csvfile)
                 writer.writerow(csv_results)
 
-            self.monitor_logs()
-
-
-            current_time = time.time()
-
-            logging.debug(f'current time: {current_time} \
-                          last restart time: {self.last_restart_time}')
-            if current_time - self.last_restart_time >= 24 * 60 * 60:
+            self.monitor_logs()  
+            
+            if (current_time.strftime('%H') == self.reset_time):
                 self.restart_server()
-                self.last_restart_time = current_time
             
             time.sleep(5)
 
@@ -537,7 +532,6 @@ class McServerController:
                 logging.info(f'{left} left the Game.')
                 logging.info(f'{joined} joined the Game.')
 
-
 def set_up_logging(level_str, log_file_size=1):
     """
     Set up logging configuration.
@@ -574,7 +568,6 @@ def set_up_logging(level_str, log_file_size=1):
     logging.getLogger().addHandler(file_handler)
 
     return file_handler
-
 
 def main(parser: argparse.ArgumentParser):
     # logging.info(f'Pif: {os.getpid()}')
