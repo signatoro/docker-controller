@@ -1,6 +1,7 @@
 
 import csv
 import datetime
+import gzip
 import os
 import time
 import shutil
@@ -12,6 +13,8 @@ import daemon
 import docker
 from mcrcon import MCRcon
 from docker.models.containers import Container
+from datetime import datetime
+import pytz
 
 class McServerController:
     """
@@ -40,7 +43,7 @@ class McServerController:
     - restart_server(self): Restarts the Minecraft server.
     - shutdown_server(self): Shuts down the Minecraft server.
     - backup_server_folder(self): Performs a backup of the server folder.
-    - send_command(self, command): Sends a command to the Minecraft server via RCON.
+    - __send_command(self, command): Sends a command to the Minecraft server via RCON.
     - __check_server_online(self): Checks if the server is online and ready to accept commands.
     - __await_status(self, status): Waits for the container status to reach the specified status.
     """
@@ -48,7 +51,7 @@ class McServerController:
     container: Container = None
 
     old_players: list[str] = []
-    def __init__(self, name, max_ram, port, rcon, volumes, hardcore, difficulty, version, take_new):
+    def __init__(self, name, max_ram, port, rcon, volumes, hardcore, difficulty, version, take_new, reset_time, raw_timezone):
 
         """
         Initializes the Minecraft Server Controller.
@@ -71,6 +74,9 @@ class McServerController:
         self.hardcore = hardcore
         self.difficulty = difficulty
         self.version = version
+        self.raw_timezone = raw_timezone
+        self.timezone = pytz.timezone(raw_timezone)
+        self.reset_time = reset_time
 
         self.last_logged_line: str
 
@@ -99,7 +105,7 @@ class McServerController:
         logging.info(f'Pid 2: {os.getpid()}')
 
         # container_stream = self.container.logs(stream=True)
-        last_logged_line = ""
+        self.last_logged_line = ""
 
 
         while self.server_running:
@@ -118,19 +124,6 @@ class McServerController:
 
             self.monitor_logs()
 
-            # logging.debug(self.get_player_count())
-            # logging.debug(self.get_players_online())
-
-            # self.check_player_change()
-
-            # new_logs = logs_results.splitlines()[len(last_logged_line.splitlines()):]
-            
-            # for line in new_logs:
-            #     logging.info(line)
-            # # logging.info(logs_results)
-
-            # last_logged_line = logs_results
-
 
             current_time = time.time()
 
@@ -142,46 +135,7 @@ class McServerController:
             
             time.sleep(5)
 
-    def check_player_change(self):
-        """
-        Check for changes in the list of players online and print the players who joined or left the game.
-
-        This method compares the current list of players online with the previous list of players and
-        prints the players who joined or left the game. It also updates the previous list of players.
-
-        Returns:
-            None
-        """
-        current_players = sorted(self.get_players_online())
-        sold = sorted(self.old_players)
-
-        if current_players == sold:
-            return
-        if len(current_players) == 0 and len(self.old_players) == 0:
-            return
-        
-        if len(current_players) > len(self.old_players):
-            new_players = set(current_players) - set(self.old_players)
-            logging.info(f'{new_players} joined the Game.')
-            self.old_players = current_players
-        
-        elif len(current_players) < len(self.old_players):
-            left_players = set(self.old_players) - set(current_players)
-            logging.info(f'{left_players} left the Game.')
-            self.old_players = current_players
-        # Same length different players
-        elif len(current_players) == len(self.old_players):
-            intersection = set(current_players).intersection(set(self.old_players))
-            if intersection == []:
-                logging.info(f'{self.old_players} left the Game.')
-                logging.info(f'{current_players} joined the Game.')
-                self.old_players = current_players
-            else:
-                left = list(set(self.old_players) - set(current_players))
-                joined = list(set(current_players) - set(self.old_players))
-                logging.info(f'{left} left the Game.')
-                logging.info(f'{joined} joined the Game.')
-
+    
     def monitor_logs(self):
         """
         Monitors the server logs for new entries.
@@ -192,19 +146,15 @@ class McServerController:
         Returns:
             None
         """
-        logging.info('Checking Logs')
-        # container_stream = self.container.logs(stream=True)
-
+        logging.debug('Checking Docker Logs')
         # while self.server_running:
         logs_results = self.container.logs(stream=False)
-        new_logs = logs_results.splitlines()[len(last_logged_line.splitlines()):]
+        new_logs = logs_results.splitlines()[len(self.last_logged_line.splitlines()):]
 
         for line in new_logs:
             logging.info(line)
 
-        last_logged_line = logs_results
-
-            # time.sleep(5)
+        self.last_logged_line = logs_results
 
     def get_player_count(self) -> str:
         """
@@ -216,13 +166,13 @@ class McServerController:
         Raises:
             Exception: If the server is offline.
         """
-        response = self.send_command('list')
+        response = self.__send_command('list')
         if response == 'failed':
             raise Exception('Server is offline')
         return f'{response.split(":")[0].strip().split(" ")[2]}/{response.split(":")[0].strip().split(" ")[7]}'
     
     def get_players_online(self) -> list[str]:
-        raw_response = self.send_command('list')
+        raw_response = self.__send_command('list')
         if raw_response == 'failed':
             raise Exception('Server is offline')
         if 'There are 0' in raw_response:
@@ -231,7 +181,7 @@ class McServerController:
     
     def __generate_data_row(self, container_stats) -> tuple:
 
-        time_stamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        time_stamp = datetime.now(self.timezone).strftime('%Y-%m-%d %H:%M:%S')
 
         total_cpu_usage = container_stats['cpu_stats']['cpu_usage']['total_usage'] - container_stats['precpu_stats']['cpu_usage']['total_usage']
         # Get the total system CPU time used
@@ -374,7 +324,7 @@ class McServerController:
             f'HARDCORE={self.hardcore}',
             f'DIFFICULTY={self.difficulty}',
             f'VERSION={self.version}',
-            f'TZ=America/New_York',
+            f'TZ={self.raw_timezone}',
         ]
 
         f_port.update({'25575/tcp': 25575})
@@ -408,16 +358,16 @@ class McServerController:
         If the server is not running, an error message is logged.
 
         """
-        logging.info("Restarting server Soon")
+        logging.info("Restarting server!")
         if self.server_running:
             self.shutdown_server()
             time.sleep(3)
             self.backup_server_folder()
+            self.last_logged_line = ''
             time.sleep(3)
             self.start_docker_container()
         else:
             logging.error("Server is not running")
-
 
     def shutdown_server(self):
         """
@@ -436,24 +386,24 @@ class McServerController:
         logging.debug("Stopping server")
         if self.server_running:
 
-            self.send_command("say !! The server will reset in 30 minute !!")
+            self.__send_command("say !! The server will reset in 30 minute !!")
 
             time.sleep(20 * 60)
 
-            self.send_command("say !! The server will reset in 10 minutes !!")
+            self.__send_command("say !! The server will reset in 10 minutes !!")
 
             time.sleep(9 * 60)
 
-            self.send_command("say !! The world will reset in 45 seconds !!")
+            self.__send_command("say !! The world will reset in 45 seconds !!")
 
             time.sleep(40)
 
-            self.send_command("say !! The server will reset 5 seconds !!")
+            self.__send_command("say !! The server will reset 5 seconds !!")
 
             time.sleep(5)
 
-            self.send_command("say !! The server is being shut down !!")
-            self.send_command("say !! It will restart in a few moments !!")
+            self.__send_command("say !! The server is being shut down !!")
+            self.__send_command("say !! It will restart in a few moments !!")
 
             time.sleep(3)
 
@@ -469,7 +419,6 @@ class McServerController:
         else:
             logging.debug("Server is already shutdown")
 
-
     def backup_server_folder(self):
         """
         Backs up the server folder by creating a zip archive of the specified volumes.
@@ -483,14 +432,27 @@ class McServerController:
             None
         """
         try:
-            logging.info("Backing up server folder")
-            shutil.make_archive('server_backup', 'zip', self.volumes)
-            logging.info("Backup complete")
+            logging.info("Backing up Server Data.")
+            current_time = datetime.now(self.timezone)
+            format_date = current_time.strftime("%Y-%m-%d")
+
+            logging.debug("Backing up server info")
+            
+            shutil.make_archive( f'server_backup', 'zip', self.volumes)
+            logging.debug("Backup complete")
+
+            logging.debug("Compressing server statistics!")
+            with open("server.log", 'rb') as file_in:
+                with gzip.open(f'{format_date}_server_data') as file_out:
+                    shutil.copyfileobj(file_in, file_out)
+
+            logging.debug("Log compression complete")
+
         except Exception as e:
             logging.error(f"Backup failed: {e}")
 
 
-    def send_command(self, command):
+    def __send_command(self, command):
         """
         Sends a command to the Minecraft server using RCON.
 
@@ -520,11 +482,11 @@ class McServerController:
         return response
 
     def __check_server_online(self):
-        response = self.send_command("say hi")
+        response = self.__send_command("say hi")
 
         while response == 'failed':
             time.sleep(6)
-            response = self.send_command("say hi")
+            response = self.__send_command("say hi")
         logging.info('Server is online')
 
     def __await_status(self, status):
@@ -533,6 +495,48 @@ class McServerController:
             logging.debug(f'Container status: {self.container.status}, Expected: {status}')
             time.sleep(6)
             self.container.reload()
+    
+    @DeprecationWarning
+    def check_player_change(self):
+        """
+        Check for changes in the list of players online and print the players who joined or left the game.
+
+        This method compares the current list of players online with the previous list of players and
+        prints the players who joined or left the game. It also updates the previous list of players.
+
+        Returns:
+            None
+        """
+        current_players = sorted(self.get_players_online())
+        sold = sorted(self.old_players)
+
+        if current_players == sold:
+            return
+        if len(current_players) == 0 and len(self.old_players) == 0:
+            return
+        
+        if len(current_players) > len(self.old_players):
+            new_players = set(current_players) - set(self.old_players)
+            logging.info(f'{new_players} joined the Game.')
+            self.old_players = current_players
+        
+        elif len(current_players) < len(self.old_players):
+            left_players = set(self.old_players) - set(current_players)
+            logging.info(f'{left_players} left the Game.')
+            self.old_players = current_players
+        # Same length different players
+        elif len(current_players) == len(self.old_players):
+            intersection = set(current_players).intersection(set(self.old_players))
+            if intersection == []:
+                logging.info(f'{self.old_players} left the Game.')
+                logging.info(f'{current_players} joined the Game.')
+                self.old_players = current_players
+            else:
+                left = list(set(self.old_players) - set(current_players))
+                joined = list(set(current_players) - set(self.old_players))
+                logging.info(f'{left} left the Game.')
+                logging.info(f'{joined} joined the Game.')
+
 
 def set_up_logging(level_str, log_file_size=1):
     """
@@ -583,7 +587,9 @@ def main(parser: argparse.ArgumentParser):
         parser.parse_args().hardcore,
         parser.parse_args().difficulty,
         parser.parse_args().version,
-        parser.parse_args().take_new
+        parser.parse_args().take_new,
+        parser.parse_args().reset_time,
+        parser.parse_args().timezone,
     )
 
     controller.run()
@@ -635,6 +641,20 @@ if __name__ == "__main__":
         help='Apply new changes to the container'
     )
 
+    parser.add_argument(
+        '--timezone',
+        default='America/New_York',
+        type=str,
+        help='Sets the timezone for the container and program. Using IANA time zone IDs.'
+    )
+
+    parser.add_argument(
+        "--reset-time", '-r',
+        default = 3,
+        type=int,
+        help="The server will reset at the top of this hour. In 24 hour time. ie. 6pm = 18"
+    )
+
     fh = set_up_logging(parser.parse_args().log_level, parser.parse_args().log_file_size)
 
     if parser.parse_args().take_new:
@@ -647,6 +667,9 @@ if __name__ == "__main__":
 
     if parser.parse_args().volumes is None:
         parser.error('Please provide a volume to mount to the server')
+
+    if parser.parse_args().reset_time > 23:
+        parser.error("Invalid time! Valid Times are 0 - 23")
 
     if parser.parse_args().daemon:
         with daemon.DaemonContext(
