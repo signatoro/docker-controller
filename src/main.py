@@ -49,8 +49,8 @@ class McServerController:
     """
 
     container: Container = None
-
     old_players: list[str] = []
+
     def __init__(self, name, max_ram, port, rcon, volumes, hardcore, difficulty, version, take_new, reset_time, raw_timezone):
 
         """
@@ -130,7 +130,6 @@ class McServerController:
             
             time.sleep(5)
 
-    
     def monitor_logs(self):
         """
         Monitors the server logs for new entries.
@@ -445,7 +444,6 @@ class McServerController:
 
         except Exception as e:
             logging.error(f"Backup failed: {e}")
-
 
     def __send_command(self, command):
         """
