@@ -16,6 +16,7 @@ from docker.models.containers import Container
 from datetime import datetime
 import pytz
 
+
 class McServerController:
     """
     A class representing a Minecraft Server Controller.
@@ -51,7 +52,7 @@ class McServerController:
     container: Container = None
     old_players: list[str] = []
 
-    def __init__(self, name, max_ram, port, rcon, volumes, hardcore, difficulty, version, take_new, reset_time, raw_timezone):
+    def __init__(self, name, max_ram, port, rcon, volumes, hardcore, difficulty, version, take_new, reset_time, raw_timezone, seed: int | None):
 
         """
         Initializes the Minecraft Server Controller.
@@ -77,6 +78,7 @@ class McServerController:
         self.raw_timezone = raw_timezone
         self.timezone = pytz.timezone(raw_timezone)
         self.reset_time = reset_time
+        self.seed = seed
 
         self.last_logged_line: str
 
@@ -87,7 +89,7 @@ class McServerController:
 
         self.start_docker_container(take_new=take_new)
 
-    def run(self):
+    async def run(self):
         """
         Runs the server monitor.
 
@@ -125,10 +127,13 @@ class McServerController:
 
             self.monitor_logs()  
             
-            if (current_time.strftime('%H') == self.reset_time):
+            
+            hour = current_time.strftime('%H')
+            logging.debug(f'Checking Time: {hour}, \n restart time: {hour}')
+            if (int(hour) == int(self.reset_time)):
                 self.restart_server()
             
-            time.sleep(5)
+            # time.sleep(5)
 
     def monitor_logs(self):
         """
@@ -248,7 +253,7 @@ class McServerController:
             logging.info(f'Container does not exist creating {self.name}')
             self.create_docker_container()
         
-        self.run()
+        
 
     def __check_environment(self, take_new):
         logging.debug('Checking environment variables')
@@ -309,6 +314,8 @@ class McServerController:
         logging.info(f'Hardcore: {self.hardcore}')
         logging.info(f'Difficulty: {self.difficulty}')
         logging.info(f'Version: {self.version}')
+        logging.info(f'Reset Time: {self.reset_time}')
+        
 
         f_port: dict = {'25565/tcp': self.port}
 
@@ -319,7 +326,12 @@ class McServerController:
             f'DIFFICULTY={self.difficulty}',
             f'VERSION={self.version}',
             f'TZ={self.raw_timezone}',
+            f'SNOOPER_ENABLED=false',
         ]
+
+        if self.seed:
+            logging.info(f'Seed: {self.seed}')
+            f_environment.append(f'SEED={self.seed}')
 
         f_port.update({'25575/tcp': 25575})
         f_environment.append('RCON_ENABLED=true')
@@ -341,6 +353,8 @@ class McServerController:
         logging.info(f'Minecraft server started with container ID: {self.container.id}')
 
         self.server_running = True
+
+    
 
     def restart_server(self):
         """
@@ -444,6 +458,10 @@ class McServerController:
 
         except Exception as e:
             logging.error(f"Backup failed: {e}")
+
+    def whitelist_player(self, username):
+        return self.__send_command(f"whitelist add {username}")
+        
 
     def __send_command(self, command):
         """
@@ -567,6 +585,9 @@ def set_up_logging(level_str, log_file_size=1):
 
     return file_handler
 
+
+controller: McServerController = None
+
 def main(parser: argparse.ArgumentParser):
     # logging.info(f'Pif: {os.getpid()}')
     controller = McServerController(
@@ -581,9 +602,11 @@ def main(parser: argparse.ArgumentParser):
         parser.parse_args().take_new,
         parser.parse_args().reset_time,
         parser.parse_args().timezone,
+        parser.parse_args().seed,
     )
 
     controller.run()
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Start Minecraft server with Docker')
@@ -596,7 +619,7 @@ if __name__ == "__main__":
         type=str,
         help='Password for the RCON for the server. Default leave RCON off.'
     )
-    parser.add_argument('--volumes', '-v', help='List of volumes to mount to the server')
+    parser.add_argument('--volumes', '-v', type=str, help='List of volumes to mount to the server')
     parser.add_argument(
         '--hardcore',
         default=False,
@@ -631,19 +654,23 @@ if __name__ == "__main__":
         type=bool,
         help='Apply new changes to the container'
     )
-
     parser.add_argument(
         '--timezone',
         default='America/New_York',
         type=str,
         help='Sets the timezone for the container and program. Using IANA time zone IDs.'
     )
-
     parser.add_argument(
         "--reset-time", '-r',
         default = 3,
         type=int,
         help="The server will reset at the top of this hour. In 24 hour time. ie. 6pm = 18"
+    )
+    parser.add_argument(
+        "--seed",
+        type=str,
+        default=None,
+        help='The seed the world should use to generate the terrain when first creating the world.'
     )
 
     fh = set_up_logging(parser.parse_args().log_level, parser.parse_args().log_file_size)
@@ -661,6 +688,8 @@ if __name__ == "__main__":
 
     if parser.parse_args().reset_time > 23:
         parser.error("Invalid time! Valid Times are 0 - 23")
+
+    
 
     if parser.parse_args().daemon:
         with daemon.DaemonContext(
