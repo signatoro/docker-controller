@@ -17,7 +17,7 @@ class McContainerController():
         if self.servers:
             for id, server in self.servers.items():
                 await server.check()
-        print("Done Checking ")
+        print("Done Checking")
 
     def add_minecraft_server(self, server_info: McServerInformation):
         mc_server = McServer(
