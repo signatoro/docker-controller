@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.routs import router as backend_router
 from api.minecraftRoutes import McRoutes
-from util.depends import check_container, check_periodically
+from util.depends import check_periodically
 from controller.minecraftControllers import McContainerController
 
 def run_start():

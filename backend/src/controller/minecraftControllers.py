@@ -5,10 +5,10 @@ from schema.minecraftServerInfromation import McServerInformation
 
 class McContainerController():
 
-    servers: dict[int: McServer]
+    servers: dict[str: McServer]
 
     def __init__(self):
-        self.servers = {}
+        self.servers: dict[str: McServer] = {}
         return
     
 
@@ -17,6 +17,7 @@ class McContainerController():
         if self.servers:
             for id, server in self.servers.items():
                 await server.check()
+        print("Done Checking ")
 
     def add_minecraft_server(self, server_info: McServerInformation):
         mc_server = McServer(
@@ -34,6 +35,10 @@ class McContainerController():
         )
 
         self.servers[server_info.name] = mc_server
+    
+    def whitelist_player(self, id: str, username: str):
+        print("in controller")
+        self.servers[id].whitelist_player(username)
 
 
 

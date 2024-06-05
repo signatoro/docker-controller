@@ -14,7 +14,7 @@ class McServerInformation(BaseModel):
     rcon: str | None = 'super'
     hardcore: bool | None = False
     difficulty: int | None = 3
-    version: str | None = 'lad test'
+    version: str | None = 'latest'
     raw_timezone: str | None = 'America/New_York'
     reset_time: int | None = 3
     name: str | None = 'minecraft_server'

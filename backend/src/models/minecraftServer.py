@@ -77,7 +77,6 @@ class McServer(McServerInformation):
         Returns:
             None
         """
-        print("Here 1")
         logging.info('Starting server monitor')
         logging.info(f'Pid 2: {os.getpid()}')
 
@@ -300,6 +299,7 @@ class McServer(McServerInformation):
             f'VERSION={self.version}',
             f'TZ={self.raw_timezone}',
             f'SNOOPER_ENABLED=false',
+            f'ENABLE_WHITELIST=true',
         ]
 
         if self.seed:
@@ -433,6 +433,7 @@ class McServer(McServerInformation):
             logging.error(f"Backup failed: {e}")
 
     def whitelist_player(self, username):
+        print("in server")
         return self.__send_command(f"whitelist add {username}")
         
 
@@ -451,6 +452,7 @@ class McServer(McServerInformation):
 
         """
         response = ''
+        print ("Here 1")
 
         logging.debug(f'Sending command: {command}')
         try:
