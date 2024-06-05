@@ -1,0 +1,4 @@
+pydantic
+fastapi
+docker
+mcrcon
