@@ -11,15 +11,19 @@ class McContainerController():
         self.servers: dict[str: McServer] = {}
         return
     
+    def get_servers(self):
+        return self.servers
 
     async def check_servers(self):
-        print("Checking Servers")
         if self.servers:
             for id, server in self.servers.items():
                 await server.check()
-        print("Done Checking")
+    
+    def __check_server_exists(self, id: str) -> bool:
 
-    def add_minecraft_server(self, server_info: McServerInformation):
+        return False
+
+    def create_minecraft_server(self, server_info: McServerInformation):
         mc_server = McServer(
             name=server_info.name,
             max_ram=server_info.max_ram,
@@ -38,7 +42,17 @@ class McContainerController():
     
     def whitelist_player(self, id: str, username: str):
         print("in controller")
-        self.servers[id].whitelist_player(username)
+        return self.servers[id].whitelist_player(username)
+
+    
+    def check_status(self, id:str):
+        return
+    
+    def get_server_players_online(self, id:str):
+        return self.servers[id].get_players_online()
+         
+    
+    
 
 
 

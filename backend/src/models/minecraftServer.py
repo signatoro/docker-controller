@@ -3,9 +3,13 @@ import csv
 import time
 import gzip
 import shutil
+import logging
 import datetime
-from datetime import datetime
 from typing import Any
+from datetime import datetime
+from logging.handlers import RotatingFileHandler
+
+
 
 import pytz
 import docker
@@ -36,6 +40,7 @@ class McServer(McServerInformation):
                 raw_timezone: str | None = 'America/New_York',
                 reset_time: int | None = 3,
                 take_new: bool | None = False,
+                logging_level: str | None = "INFO"
         ):
         """
         Initializes the Minecraft Server Controller.
@@ -60,8 +65,26 @@ class McServer(McServerInformation):
         self.__server_running = False
         self.__client = docker.from_env()
         self.__last_logged_line = ""
+        self.__logging_level = logging_level
+
+        self.__configure_logger()
 
         self.start_docker_container(take_new=take_new)
+
+        
+
+    def __configure_logger(self):
+
+        # Add a rotating file handler to limit the log file size
+        file_handler = RotatingFileHandler(
+            f'{self.name}.log',
+            maxBytes=1024*1024*7,
+            backupCount=5)
+        file_handler.setLevel(self.__logging_level)
+        file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+
+        logging.getLogger(f'{self.name}').addHandler(file_handler)
+        return
 
     async def check(self):
         """
@@ -77,13 +100,13 @@ class McServer(McServerInformation):
         Returns:
             None
         """
-        logging.info('Starting server monitor')
-        logging.info(f'Pid 2: {os.getpid()}')
+        logging.getLogger(f'{self.name}').info('Starting server monitor')
+        logging.getLogger(f'{self.name}').info(f'Pid 2: {os.getpid()}')
 
         # container_stream = self.container.logs(stream=True)
         self.__last_logged_line = ""
         
-        logging.debug('Reloading container')
+        logging.getLogger(f'{self.name}').debug('Reloading container')
         self.__container.reload()
         current_time = datetime.now(self.__timezone)
 
@@ -101,7 +124,7 @@ class McServer(McServerInformation):
         
         
         hour = current_time.strftime('%H')
-        logging.debug(f'Checking Time: {hour}, \n restart time: {hour}')
+        logging.getLogger(f'{self.name}').debug(f'Checking Time: {hour}, \n restart time: {hour}')
         if (int(hour) == int(self.reset_time)):
             self.restart_server()
             
@@ -117,13 +140,13 @@ class McServer(McServerInformation):
         Returns:
             None
         """
-        logging.debug('Checking Docker Logs')
+        logging.getLogger(f'{self.name}').debug('Checking Docker Logs')
         # while self.__server_running:
         logs_results = self.__container.logs(stream=False)
         new_logs = logs_results.splitlines()[len(self.__last_logged_line.splitlines()):]
 
         for line in new_logs:
-            logging.info(line)
+            logging.getLogger(f'{self.name}').info(line)
 
         self.__last_logged_line = logs_results
 
@@ -197,11 +220,11 @@ class McServer(McServerInformation):
         Returns:
             None
         """
-        logging.info('Starting server')
+        logging.getLogger(f'{self.name}').info('Starting server')
 
         if self.__client.containers.list(all=True, filters={'name': self.name}):
 
-            logging.info(f'Container {self.name} exists')
+            logging.getLogger(f'{self.name}').info(f'Container {self.name} exists')
             self.__container = self.__client.containers.get(self.name)
 
 
@@ -209,33 +232,31 @@ class McServer(McServerInformation):
 
 
             if self.__container.status == 'exited':
-                logging.debug(f'Container {self.name} is stopped. starting...')
+                logging.getLogger(f'{self.name}').debug(f'Container {self.name} is stopped. starting...')
                 self.__container.start()
                 self.__check_server_online()
                 self.__server_running = True
 
             elif self.__container.status == 'running':
-                logging.debug(f'Container {self.name} is already running')
+                logging.getLogger(f'{self.name}').debug(f'Container {self.name} is already running')
                 self.__server_running = True 
 
             else:
-                logging.error(f'!! Unknown Status !! Container status: {self.__container.status}')
+                logging.getLogger(f'{self.name}').error(f'!! Unknown Status !! Container status: {self.__container.status}')
                 raise Exception(f'!! Unknown Status !! Container status: {self.__container.status}')
         else:
-            logging.info(f'Container does not exist creating {self.name}')
+            logging.getLogger(f'{self.name}').info(f'Container does not exist creating {self.name}')
             self.create_docker_container()
         
-        
-
     def __check_environment(self, take_new):
-        logging.debug('Checking environment variables')
+        logging.getLogger(f'{self.name}').debug('Checking environment variables')
         environment = self.__container.attrs['Config']['Env']
         volumes = self.__container.attrs['HostConfig']['Binds']
 
         if not take_new:
             if volumes != [f'{self.volumes}:/data:rw']:
-                logging.info(f'Volumes {volumes} are different than already set.')
-                logging.warning('Restart Program server with --take-new \
+                logging.getLogger(f'{self.name}').info(f'Volumes {volumes} are different than already set.')
+                logging.getLogger(f'{self.name}').warning('Restart Program server with --take-new \
                                 (-t) to apply new changes to the container')
 
             for env in environment:
@@ -245,19 +266,19 @@ class McServer(McServerInformation):
                 env.startswith('DIFFICULTY=') and env != f'DIFFICULTY={self.difficulty}' or \
                 env.startswith('RCON_ENABLED=') and env != 'RCON_ENABLED=true' or \
                 env.startswith('RCON_PASSWORD=') and env != f'RCON_PASSWORD={self.rcon}':
-                    logging.info(f'Environment variable {env} are different than already set.')
-                    logging.warning('Restart Program server with --take-new \
+                    logging.getLogger(f'{self.name}').info(f'Environment variable {env} are different than already set.')
+                    logging.getLogger(f'{self.name}').warning('Restart Program server with --take-new \
                                     (-t) to apply new changes to the container')
         else:
-            logging.info('Applying new changes to the container')
+            logging.getLogger(f'{self.name}').info('Applying new changes to the container')
 
-            logging.debug(f'Current Environment: m{environment}')
-            logging.debug(f'Current Volumes: {volumes}')
+            logging.getLogger(f'{self.name}').debug(f'Current Environment: m{environment}')
+            logging.getLogger(f'{self.name}').debug(f'Current Volumes: {volumes}')
 
-            logging.debug('New Environment:')
+            logging.getLogger(f'{self.name}').debug('New Environment:')
             for attr, value in self.__dict__.items():
-                logging.debug(f'{attr}: {value}')
-            logging.debug(f'Volumes: {self.volumes}')
+                logging.getLogger(f'{self.name}').debug(f'{attr}: {value}')
+            logging.getLogger(f'{self.name}').debug(f'Volumes: {self.volumes}')
 
             if self.__container.status == 'running':
                 self.__container.stop()
@@ -278,15 +299,15 @@ class McServer(McServerInformation):
         Returns:
             None
         """
-        logging.info('Starting Minecraft server with the following parameters:')
-        logging.info(f'Max RAM: {self.max_ram}')
-        logging.info(f'Port: {self.port}')
-        logging.info(f'RCON: {self.rcon}')
-        logging.info(f'Volumes: {self.volumes}')
-        logging.info(f'Hardcore: {self.hardcore}')
-        logging.info(f'Difficulty: {self.difficulty}')
-        logging.info(f'Version: {self.version}')
-        logging.info(f'Reset Time: {self.reset_time}')
+        logging.getLogger(f'{self.name}').info('Starting Minecraft server with the following parameters:')
+        logging.getLogger(f'{self.name}').info(f'Max RAM: {self.max_ram}')
+        logging.getLogger(f'{self.name}').info(f'Port: {self.port}')
+        logging.getLogger(f'{self.name}').info(f'RCON: {self.rcon}')
+        logging.getLogger(f'{self.name}').info(f'Volumes: {self.volumes}')
+        logging.getLogger(f'{self.name}').info(f'Hardcore: {self.hardcore}')
+        logging.getLogger(f'{self.name}').info(f'Difficulty: {self.difficulty}')
+        logging.getLogger(f'{self.name}').info(f'Version: {self.version}')
+        logging.getLogger(f'{self.name}').info(f'Reset Time: {self.reset_time}')
         
 
         f_port: dict = {'25565/tcp': self.port}
@@ -303,7 +324,7 @@ class McServer(McServerInformation):
         ]
 
         if self.seed:
-            logging.info(f'Seed: {self.seed}')
+            logging.getLogger(f'{self.name}').info(f'Seed: {self.seed}')
             f_environment.append(f'SEED={self.seed}')
 
         f_port.update({'25575/tcp': 25575})
@@ -323,11 +344,9 @@ class McServer(McServerInformation):
         self.__check_server_online()
         self.__await_status('running')
 
-        logging.info(f'Minecraft server started with container ID: {self.__container.id}')
+        logging.getLogger(f'{self.name}').info(f'Minecraft server started with container ID: {self.__container.id}')
 
         self.__server_running = True
-
-    
 
     def restart_server(self):
         """
@@ -339,7 +358,7 @@ class McServer(McServerInformation):
         If the server is not running, an error message is logged.
 
         """
-        logging.info("Restarting server!")
+        logging.getLogger(f'{self.name}').info("Restarting server!")
         if self.__server_running:
             self.shutdown_server()
             time.sleep(3)
@@ -348,7 +367,7 @@ class McServer(McServerInformation):
             time.sleep(3)
             self.start_docker_container()
         else:
-            logging.error("Server is not running")
+            logging.getLogger(f'{self.name}').error("Server is not running")
 
     def shutdown_server(self):
         """
@@ -364,7 +383,7 @@ class McServer(McServerInformation):
         Returns:
             None
         """
-        logging.debug("Stopping server")
+        logging.getLogger(f'{self.name}').debug("Stopping server")
         if self.__server_running:
 
             self.__send_command("say !! The server will reset in 30 minute !!")
@@ -388,7 +407,7 @@ class McServer(McServerInformation):
 
             time.sleep(3)
 
-            logging.info("Server shutdown beginning")
+            logging.getLogger(f'{self.name}').info("Server shutdown beginning")
 
             self.__container.stop()
 
@@ -396,9 +415,9 @@ class McServer(McServerInformation):
 
             self.__server_running = False
             time.sleep(4)
-            logging.info("Server shutdown complete")
+            logging.getLogger(f'{self.name}').info("Server shutdown complete")
         else:
-            logging.debug("Server is already shutdown")
+            logging.getLogger(f'{self.name}').debug("Server is already shutdown")
 
     def backup_server_folder(self):
         """
@@ -413,30 +432,33 @@ class McServer(McServerInformation):
             None
         """
         try:
-            logging.info("Backing up Server Data.")
+            logging.getLogger(f'{self.name}').info("Backing up Server Data.")
             current_time = datetime.now(self.__timezone)
             format_date = current_time.strftime("%Y-%m-%d")
 
-            logging.debug("Backing up server info")
+            logging.getLogger(f'{self.name}').debug("Backing up server info")
             
             shutil.make_archive( f'server_backup', 'zip', self.volumes)
-            logging.debug("Backup complete")
+            logging.getLogger(f'{self.name}').debug("Backup complete")
 
-            logging.debug("Compressing server statistics!")
+            logging.getLogger(f'{self.name}').debug("Compressing server statistics!")
             with open("server.log", 'rb') as file_in:
                 with gzip.open(f'{format_date}_server_data') as file_out:
                     shutil.copyfileobj(file_in, file_out)
 
-            logging.debug("Log compression complete")
+            logging.getLogger(f'{self.name}').debug("Log compression complete")
 
         except Exception as e:
-            logging.error(f"Backup failed: {e}")
+            logging.getLogger(f'{self.name}').error(f"Backup failed: {e}")
 
     def whitelist_player(self, username):
-        print("in server")
-        return self.__send_command(f"whitelist add {username}")
-        
+        response =  self.__send_command(f"whitelist add {username}")
 
+        if response:
+            return f"Successfully Whitelisted {username}"
+        else:
+            return response
+        
     def __send_command(self, command):
         """
         Sends a command to the Minecraft server using RCON.
@@ -452,17 +474,15 @@ class McServer(McServerInformation):
 
         """
         response = ''
-        print ("Here 1")
-
-        logging.debug(f'Sending command: {command}')
+        logging.getLogger(f'{self.name}').debug(f'Sending command: {command}')
         try:
             # Replace 'your_rcon_password' and 'your_minecraft_server_ip'
             # with your actual RCON password and server IP
             with MCRcon('0.0.0.0', 'super', 25575, timeout=10) as client:
                 response = client.command(command)
-                logging.debug(f'Message Response: {response}')
+                logging.getLogger(f'{self.name}').debug(f'Message Response: {response}')
         except Exception as e:
-            # logging.error(f'Command Failed {command}, {e}')
+            # logging.getLogger(f'{self.name}').error(f'Command Failed {command}, {e}')
             return 'failed'
 
         return response
@@ -473,12 +493,12 @@ class McServer(McServerInformation):
         while response == 'failed':
             time.sleep(6)
             response = self.__send_command("say hi")
-        logging.info('Server is online')
+        logging.getLogger(f'{self.name}').info('Server is online')
 
     def __await_status(self, status):
-        logging.info(f'Awaiting status: {status}')
+        logging.getLogger(f'{self.name}').info(f'Awaiting status: {status}')
         while self.__container.status != status:
-            logging.debug(f'Container status: {self.__container.status}, Expected: {status}')
+            logging.getLogger(f'{self.name}').debug(f'Container status: {self.__container.status}, Expected: {status}')
             time.sleep(6)
             self.__container.reload()
                
