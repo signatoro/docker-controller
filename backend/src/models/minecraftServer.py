@@ -71,8 +71,6 @@ class McServer(McServerInformation):
 
         self.start_docker_container(take_new=take_new)
 
-        
-
     def __configure_logger(self):
 
         # Add a rotating file handler to limit the log file size
@@ -100,11 +98,11 @@ class McServer(McServerInformation):
         Returns:
             None
         """
-        logging.getLogger(f'{self.name}').info('Starting server monitor')
-        logging.getLogger(f'{self.name}').info(f'Pid 2: {os.getpid()}')
+        # logging.getLogger(f'{self.name}').info('Starting server monitor')
+        # logging.getLogger(f'{self.name}').info(f'Pid 2: {os.getpid()}')
 
         # container_stream = self.container.logs(stream=True)
-        self.__last_logged_line = ""
+        # self.__last_logged_line = ""
         
         logging.getLogger(f'{self.name}').debug('Reloading container')
         self.__container.reload()
@@ -501,4 +499,3 @@ class McServer(McServerInformation):
             logging.getLogger(f'{self.name}').debug(f'Container status: {self.__container.status}, Expected: {status}')
             time.sleep(6)
             self.__container.reload()
-               
