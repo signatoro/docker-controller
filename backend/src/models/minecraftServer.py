@@ -448,6 +448,10 @@ class McServer(McServerInformation):
 
         except Exception as e:
             logging.getLogger(f'{self.name}').error(f"Backup failed: {e}")
+    
+    def op_player(self, username):
+        response = self.__send_command(f'op {username}')
+        return response
 
     def whitelist_player(self, username):
         response =  self.__send_command(f"whitelist add {username}")

@@ -50,6 +50,10 @@ class McContainerController():
     
     def get_server_players_online(self, id:str):
         return self.servers[id].get_players_online()
+    
+    def op_player(self, id: str, username: str):
+
+        return self.servers[id].op_player(username)
          
     
     

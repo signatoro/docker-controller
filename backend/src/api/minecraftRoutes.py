@@ -18,6 +18,7 @@ class McRoutes():
         self.router.add_api_route("/server", self.create_minecraft_server, methods=["POST"])
         self.router.add_api_route("/server/{id}", self.whitelist_player, methods=["POST"])
         self.router.add_api_route("/server/{id}", self.check_players_online, methods=['GET'])
+        self.router.add_api_route("/server/{id}/op", self.op_player, methods=["POST"])
 
     async def get_servers(self):
         return self.controller.get_servers()
@@ -32,3 +33,6 @@ class McRoutes():
 
     async def check_players_online(self, id: str) -> list[str]:
         return self.controller.get_server_players_online(id)
+    
+    async def op_player(self, id: str, username: str):
+        return self.controller.op_player(id, username)
