@@ -77,4 +77,7 @@ def set_up_logging(level_str: str | None = 'INFO', log_file_size: int | None = 1
 
 
 if __name__ == '__main__':
-    uvicorn.run("main:run_start", host="0.0.0.0", port=8000, reload="True", factory=True)
+    parser = argparse.ArgumentParser(description='Start Minecraft server with Docker')
+    parser.add_argument('-r', '--reload',action='store_true', help='Run the server in daemon mode')
+    print(parser.parse_args().reload)
+    uvicorn.run("main:run_start", host="0.0.0.0", port=8000, reload=parser.parse_args().reload, factory=True)

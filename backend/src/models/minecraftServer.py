@@ -440,7 +440,7 @@ class McServer(McServerInformation):
             logging.getLogger(f'{self.name}').debug("Backup complete")
 
             logging.getLogger(f'{self.name}').debug("Compressing server statistics!")
-            with open("server.log", 'rb') as file_in:
+            with open(f"{self.name}.log", 'rb') as file_in:
                 with gzip.open(f'{format_date}_server_data') as file_out:
                     shutil.copyfileobj(file_in, file_out)
 
