@@ -1,13 +1,12 @@
 
-from fastapi import APIRouter
-
+from deps.dependenceis import DiscordRoute
 from schema.minecraftServerInfromation import McServerInformation
 from controller.minecraftControllers import McContainerController
 
 
 
 class McRoutes():
-    router: APIRouter = APIRouter(
+    router: DiscordRoute = DiscordRoute(
         prefix='/mc',
         tags=['Minecraft']
     )

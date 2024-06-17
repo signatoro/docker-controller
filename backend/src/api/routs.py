@@ -2,8 +2,10 @@ from fastapi import APIRouter, FastAPI
 import pandas as pd
 from fastapi.middleware.cors import CORSMiddleware
 
+from deps.dependenceis import DiscordRoute
 
-router = APIRouter()
+
+router = DiscordRoute()
 
 @router.get("/cpu-data")
 async def get_cpu_data():
