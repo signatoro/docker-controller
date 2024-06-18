@@ -10,6 +10,8 @@ data/*
 *.zip
 *.csv
 
+.env
+
 build/
 
 node_modules/
